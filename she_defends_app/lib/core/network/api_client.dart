@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'dart:io';
 
 class ApiClient {
@@ -39,7 +40,7 @@ class ApiClient {
       },
       onError: (DioException e, handler) {
         // Centralized API error logger
-        print("API Error [${e.response?.statusCode}]: ${e.message}");
+        debugPrint("API Error [${e.response?.statusCode}]: ${e.message}");
         return handler.next(e);
       },
     ));

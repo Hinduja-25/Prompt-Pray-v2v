@@ -161,7 +161,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: DropdownButtonFormField<String>(
-                        value: _selectedBloodGroup,
+                        initialValue: _selectedBloodGroup,
                         decoration: const InputDecoration(labelText: "Blood Group"),
                         items: ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"].map((g) => DropdownMenuItem(value: g, child: Text(g))).toList(),
                         onChanged: (val) {
@@ -182,7 +182,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 const SizedBox(height: 12),
                 
                 DropdownButtonFormField<String>(
-                  value: _selectedDiet,
+                  initialValue: _selectedDiet,
                   decoration: const InputDecoration(labelText: "Dietary Preference"),
                   items: ["Vegetarian", "Vegan", "Non-Vegetarian"].map((d) => DropdownMenuItem(value: d, child: Text(d))).toList(),
                   onChanged: (val) {
@@ -191,7 +191,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
-                  value: _selectedGoal,
+                  initialValue: _selectedGoal,
                   decoration: const InputDecoration(labelText: "Fitness Goal"),
                   items: ["Healthy Maintenance", "Weight Loss", "Weight Gain", "Muscle Gain"].map((g) => DropdownMenuItem(value: g, child: Text(g))).toList(),
                   onChanged: (val) {
@@ -200,7 +200,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
-                  value: _selectedActivity,
+                  initialValue: _selectedActivity,
                   decoration: const InputDecoration(labelText: "Activity Level"),
                   items: ["Sedentary", "Lightly Active", "Active", "Very Active"].map((a) => DropdownMenuItem(value: a, child: Text(a))).toList(),
                   onChanged: (val) {
@@ -389,7 +389,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 icon: const Icon(Icons.logout, color: AppColors.emergency),
                 label: const Text("Sign Out", style: TextStyle(color: AppColors.emergency)),
                 style: OutlinedButton.styleFrom(
-                  side: BorderSide(color: AppColors.emergency.withOpacity(0.4)),
+                  side: BorderSide(color: AppColors.emergency.withValues(alpha: 0.4)),
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
                 ),
@@ -417,20 +417,20 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
   Widget _buildBmiBadge(double bmi) {
     String text = "Normal";
-    Color bg = AppColors.success.withOpacity(0.1);
+    Color bg = AppColors.success.withValues(alpha: 0.1);
     Color fg = AppColors.success;
     
     if (bmi < 18.5) {
       text = "Underweight";
-      bg = Colors.orange.withOpacity(0.1);
+      bg = Colors.orange.withValues(alpha: 0.1);
       fg = Colors.orange;
     } else if (bmi >= 25 && bmi < 30) {
       text = "Overweight";
-      bg = Colors.orange.withOpacity(0.1);
+      bg = Colors.orange.withValues(alpha: 0.1);
       fg = Colors.orange;
     } else if (bmi >= 30) {
       text = "Obese";
-      bg = AppColors.emergency.withOpacity(0.1);
+      bg = AppColors.emergency.withValues(alpha: 0.1);
       fg = AppColors.emergency;
     }
 

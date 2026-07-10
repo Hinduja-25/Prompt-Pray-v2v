@@ -9,11 +9,7 @@ class NotificationService {
     if (_initialized) return;
 
     const AndroidInitializationSettings androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
-    const DarwinInitializationSettings iosSettings = DarwinInitializationSettings(
-      requestAlertPermission: true,
-      requestBadgePermission: true,
-      requestSoundPermission: true,
-    );
+    const DarwinInitializationSettings iosSettings = DarwinInitializationSettings();
 
     const InitializationSettings initSettings = InitializationSettings(
       android: androidSettings,
@@ -22,7 +18,7 @@ class NotificationService {
 
     try {
       await _localNotifications.initialize(
-        initSettings,
+        initializationSettings: initSettings,
         onDidReceiveNotificationResponse: (NotificationResponse response) {
           debugPrint("Notification clicked: ${response.payload}");
         },
@@ -59,10 +55,10 @@ class NotificationService {
 
     try {
       await _localNotifications.show(
-        id,
-        title,
-        body,
-        platformDetails,
+        id: id,
+        title: title,
+        body: body,
+        notificationDetails: platformDetails,
         payload: payload,
       );
     } catch (e) {

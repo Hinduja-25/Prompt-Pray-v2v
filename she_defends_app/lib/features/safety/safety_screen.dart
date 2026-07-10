@@ -18,7 +18,7 @@ class _SafetyScreenState extends ConsumerState<SafetyScreen> {
   String _selectedContactCategory = "Family";
 
   String _selectedRouteType = "safe"; // Default to 'safe'
-  bool _isStealthExpanded = false;
+  final bool _isStealthExpanded = false;
   final _apiClient = ApiClient();
 
   @override
@@ -85,8 +85,8 @@ class _SafetyScreenState extends ConsumerState<SafetyScreen> {
     }
 
     try {
-      final res = await _apiClient.post("/safety/contacts", data: data);
-      final savedId = res.data["id"] ?? editId ?? DateTime.now().millisecondsSinceEpoch.toString();
+      await _apiClient.post("/safety/contacts", data: data);
+      // final savedId = res.data["id"] ?? editId ?? DateTime.now().millisecondsSinceEpoch.toString();
       
       if (editId != null) {
         ref.read(emergencyContactsProvider.notifier).editContact(editId, name, phone, _selectedContactCategory);
@@ -96,6 +96,7 @@ class _SafetyScreenState extends ConsumerState<SafetyScreen> {
       
       _contactNameController.clear();
       _contactPhoneController.clear();
+      if (!mounted) return;
       Navigator.pop(context);
     } catch (e) {
       debugPrint("Failed to save contact to backend: $e");
@@ -141,7 +142,7 @@ class _SafetyScreenState extends ConsumerState<SafetyScreen> {
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
-              value: _selectedContactCategory,
+              initialValue: _selectedContactCategory,
               decoration: const InputDecoration(labelText: "Relationship Category"),
               items: ["Family", "Friends", "Guardians", "Emergency Services"].map((cat) {
                 return DropdownMenuItem(value: cat, child: Text(cat));
@@ -169,7 +170,7 @@ class _SafetyScreenState extends ConsumerState<SafetyScreen> {
   Widget build(BuildContext context) {
     final guardianState = ref.watch(guardianProvider);
     final stealthState = ref.watch(stealthProvider);
-    final fakeCallState = ref.watch(fakeCallProvider);
+    // final fakeCallState = ref.watch(fakeCallProvider);
     final contacts = ref.watch(emergencyContactsProvider);
 
     final isJourneyActive = guardianState.status == GuardianStatus.active || 
@@ -195,7 +196,7 @@ class _SafetyScreenState extends ConsumerState<SafetyScreen> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: isJourneyActive ? AppColors.success.withOpacity(0.1) : AppColors.textMuted.withOpacity(0.1),
+                    color: isJourneyActive ? AppColors.success.withValues(alpha: 0.1) : AppColors.textMuted.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Row(
@@ -314,7 +315,7 @@ class _SafetyScreenState extends ConsumerState<SafetyScreen> {
                   right: 12,
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(color: Colors.black.withOpacity(0.6), borderRadius: BorderRadius.circular(8)),
+                    decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.6), borderRadius: BorderRadius.circular(8)),
                     child: const Row(
                       children: [
                         Icon(Icons.gps_fixed, color: Colors.green, size: 12),
@@ -461,9 +462,9 @@ class _SafetyScreenState extends ConsumerState<SafetyScreen> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: AppColors.success.withOpacity(0.06),
+                color: AppColors.success.withValues(alpha: 0.06),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.success.withOpacity(0.2)),
+                border: Border.all(color: AppColors.success.withValues(alpha: 0.2)),
               ),
               child: const Row(
                 children: [
@@ -539,7 +540,7 @@ class _SafetyScreenState extends ConsumerState<SafetyScreen> {
   // --- Deviation Warning Card ---
   Widget _buildDeviationCard() {
     return Card(
-      color: AppColors.emergency.withOpacity(0.04),
+      color: AppColors.emergency.withValues(alpha: 0.04),
       shape: RoundedRectangleBorder(side: const BorderSide(color: AppColors.emergency, width: 1.5), borderRadius: BorderRadius.circular(16)),
       child: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -604,7 +605,7 @@ class _SafetyScreenState extends ConsumerState<SafetyScreen> {
                   title: const Text("Calculator Decoy Lock", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                   subtitle: const Text("Hides app behind a working calculator decoy. Enter PIN to unlock."),
                   value: state.isCalculatorLockEnabled,
-                  activeColor: AppColors.primary,
+                  activeThumbColor: AppColors.primary,
                   contentPadding: EdgeInsets.zero,
                   onChanged: (val) {
                     ref.read(stealthProvider.notifier).toggleCalculatorLock(val);
@@ -625,7 +626,7 @@ class _SafetyScreenState extends ConsumerState<SafetyScreen> {
                   title: const Text("Silent SOS Alerts", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                   subtitle: const Text("Broadcasts distress coordinates silently without sounding alarms."),
                   value: state.isSilentSosEnabled,
-                  activeColor: AppColors.primary,
+                  activeThumbColor: AppColors.primary,
                   contentPadding: EdgeInsets.zero,
                   onChanged: (val) {
                     ref.read(stealthProvider.notifier).toggleSilentSos(val);
@@ -636,7 +637,7 @@ class _SafetyScreenState extends ConsumerState<SafetyScreen> {
                   title: const Text("Shake Phone to Alert", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                   subtitle: const Text("Trigger distress alert automatically by shaking the device."),
                   value: state.isShakeToSosEnabled,
-                  activeColor: AppColors.primary,
+                  activeThumbColor: AppColors.primary,
                   contentPadding: EdgeInsets.zero,
                   onChanged: (val) {
                     ref.read(stealthProvider.notifier).toggleShakeToSos(val);
@@ -758,7 +759,7 @@ class _SafetyScreenState extends ConsumerState<SafetyScreen> {
           margin: const EdgeInsets.only(bottom: 10),
           child: ListTile(
             leading: CircleAvatar(
-              backgroundColor: color.withOpacity(0.1),
+              backgroundColor: color.withValues(alpha: 0.1),
               child: Icon(icon, color: color, size: 20),
             ),
             title: Text(loc["name"]!, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
@@ -869,7 +870,7 @@ class MapRoutePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final gridPaint = Paint()
-      ..color = Colors.grey.withOpacity(0.15)
+      ..color = Colors.grey.withValues(alpha: 0.15)
       ..strokeWidth = 1.0;
     
     for (double i = 0; i < size.width; i += 30) {
@@ -880,7 +881,7 @@ class MapRoutePainter extends CustomPainter {
     }
 
     final pathPaint = Paint()
-      ..color = routeType == 'safe' ? AppColors.success : AppColors.primary.withOpacity(0.4)
+      ..color = routeType == 'safe' ? AppColors.success : AppColors.primary.withValues(alpha: 0.4)
       ..strokeWidth = 6.0
       ..strokeCap = StrokeCap.round
       ..style = PaintingStyle.stroke;

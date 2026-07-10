@@ -156,7 +156,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     return Card(
       elevation: 0,
-      color: AppColors.emergency.withOpacity(0.04),
+      color: AppColors.emergency.withValues(alpha: 0.04),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(18),
         side: const BorderSide(color: AppColors.emergency, width: 1.5),
@@ -212,7 +212,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
-                          color: AppColors.emergency.withOpacity(0.3),
+                          color: AppColors.emergency.withValues(alpha: 0.3),
                           blurRadius: 16,
                           spreadRadius: 4,
                         ),
@@ -244,7 +244,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         onChanged: (val) {
                           ref.read(sosProvider.notifier).toggleTriggerMode(val);
                         },
-                        activeColor: AppColors.emergency,
+                        activeThumbColor: AppColors.emergency,
                       ),
                     ),
                   ],
