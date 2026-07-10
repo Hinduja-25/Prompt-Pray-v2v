@@ -4,6 +4,7 @@ import 'package:she_defends_app/core/theme/app_theme.dart';
 import 'package:she_defends_app/features/health/symptom_checker_screen.dart';
 import 'package:she_defends_app/features/health/health_history_screen.dart';
 import 'package:she_defends_app/features/health/medication_manager_screen.dart';
+import 'package:she_defends_app/features/health/specialized_screening_screen.dart';
 import 'package:she_defends_app/core/services/notification_service.dart';
 // ScheduleRefillsScreen and AddMedicationSheet are exported from medication_manager_screen.dart
 
@@ -100,6 +101,14 @@ class _HealthScreenState extends ConsumerState<HealthScreen> {
             onPressed: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const HealthHistoryScreen()),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.assignment_ind_outlined, color: AppColors.primary),
+            tooltip: "Specialized Screenings",
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const SpecializedScreeningScreen()),
             ),
           ),
           IconButton(
@@ -227,6 +236,67 @@ class _HealthScreenState extends ConsumerState<HealthScreen> {
                   side: const BorderSide(color: AppColors.lavender, width: 2),
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+            // Specialized Health Screenings Promo Card
+            Card(
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(18),
+                side: BorderSide(color: AppColors.lavender.withValues(alpha: 0.5), width: 1.5),
+              ),
+              color: Colors.white,
+              child: Padding(
+                padding: const EdgeInsets.all(20.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: AppColors.lavender.withValues(alpha: 0.3),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.assignment_ind_outlined, color: AppColors.primary, size: 20),
+                        ),
+                        const SizedBox(width: 12),
+                        const Text(
+                          "Clinical Screenings Hub",
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.primary),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      "Perform standard, rule-based screening tests for PCOS, Breast Cancer, Endometriosis, Thyroid Disorders, and Iron Deficiency Anemia. Receive instant medical guidelines, dietary advices, and targeted exercise recommendations.",
+                      style: TextStyle(color: AppColors.textMuted, fontSize: 12, height: 1.4),
+                    ),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const SpecializedScreeningScreen()),
+                        ),
+                        icon: const Icon(Icons.fact_check_outlined, size: 16, color: Colors.white),
+                        label: const Text(
+                          "Launch Screening Hub",
+                          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                          elevation: 0,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),

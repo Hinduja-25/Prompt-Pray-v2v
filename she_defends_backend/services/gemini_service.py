@@ -19,7 +19,7 @@ except Exception as e:
 
 class GeminiService:
     def __init__(self):
-        self.model_name = "gemini-1.5-flash"
+        self.model_name = "gemini-2.0-flash"
         if gemini_initialized:
             self.model = genai.GenerativeModel(self.model_name)
 

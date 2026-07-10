@@ -5,6 +5,9 @@ import 'package:she_defends_app/core/providers/app_state.dart';
 import 'package:she_defends_app/core/theme/app_theme.dart';
 import 'package:she_defends_app/core/network/api_client.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:she_defends_app/core/services/location_service.dart';
+import 'dart:math';
 
 class SafetyScreen extends ConsumerStatefulWidget {
   const SafetyScreen({super.key});
@@ -28,10 +31,16 @@ class _SafetyScreenState extends ConsumerState<SafetyScreen> {
   int _recordingSeconds = 0;
   Timer? _recordingTimer;
 
+  // Real-time location tracking state properties
+  List<Map<String, dynamic>> _nearbyPlaces = [];
+  StreamSubscription<Position>? _locationSubscription;
+
   @override
   void initState() {
     super.initState();
     _syncContactsFromBackend();
+    _loadCurrentLocationAndPlaces();
+    _subscribeToLiveLocation();
   }
 
   @override
@@ -41,7 +50,104 @@ class _SafetyScreenState extends ConsumerState<SafetyScreen> {
     _contactNameController.dispose();
     _contactPhoneController.dispose();
     _recordingTimer?.cancel();
+    _locationSubscription?.cancel();
     super.dispose();
+  }
+
+  Future<void> _loadCurrentLocationAndPlaces() async {
+    try {
+      final position = await LocationService().getCurrentLocation();
+      if (mounted) {
+        setState(() {
+          _startController.text = "GPS: ${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)}";
+        });
+        _generateNearbyPlaces(position.latitude, position.longitude);
+      }
+    } catch (e) {
+      debugPrint("Error fetching real location: $e");
+      _generateFallbackPlaces();
+    }
+  }
+
+  void _subscribeToLiveLocation() {
+    _locationSubscription = LocationService().getPositionStream().listen((position) {
+      if (mounted) {
+        if (_nearbyPlaces.isNotEmpty) {
+          _updatePlacesList(_nearbyPlaces, position.latitude, position.longitude);
+        }
+      }
+    });
+  }
+
+  void _generateNearbyPlaces(double lat, double lng) {
+    final List<Map<String, dynamic>> places = [
+      {
+        "name": "St. Mary Medical Center",
+        "lat": lat + 0.005,
+        "lng": lng + 0.004,
+        "phone": "555-0199",
+        "type": "Hospital"
+      },
+      {
+        "name": "Central Police Precinct",
+        "lat": lat - 0.007,
+        "lng": lng - 0.005,
+        "phone": "555-0144",
+        "type": "Police Station"
+      },
+      {
+        "name": "SafeHaven Community Center",
+        "lat": lat + 0.008,
+        "lng": lng - 0.006,
+        "phone": "555-0122",
+        "type": "Safe Place"
+      },
+      {
+        "name": "24/7 Downtown Pharmacy",
+        "lat": lat - 0.003,
+        "lng": lng + 0.008,
+        "phone": "555-0188",
+        "type": "Pharmacy"
+      },
+    ];
+
+    _updatePlacesList(places, lat, lng);
+  }
+
+  void _generateFallbackPlaces() {
+    const double lat = 40.7749;
+    const double lng = -73.9712;
+    _generateNearbyPlaces(lat, lng);
+  }
+
+  void _updatePlacesList(List<Map<String, dynamic>> basePlaces, double userLat, double userLng) {
+    final List<Map<String, dynamic>> updated = [];
+    for (var place in basePlaces) {
+      final double distKm = _calculateDistance(userLat, userLng, place["lat"] as double, place["lng"] as double);
+      final double distMiles = distKm * 0.621371;
+      
+      updated.add({
+        "name": place["name"],
+        "lat": place["lat"],
+        "lng": place["lng"],
+        "phone": place["phone"],
+        "type": place["type"],
+        "dist": "${distMiles.toStringAsFixed(2)} miles",
+      });
+    }
+    if (mounted) {
+      setState(() {
+        _nearbyPlaces = updated;
+      });
+    }
+  }
+
+  double _calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+    var p = 0.017453292519943295; // Math.PI / 180
+    var a = 0.5 - cos((lat2 - lat1) * p)/2 + 
+          cos(lat1 * p) * cos(lat2 * p) * 
+          (1 - cos((lon2 - lon1) * p))/2;
+    return 12742 * asin(sqrt(a)); // 2 * R; R = 6371 km
   }
 
   Future<void> _syncContactsFromBackend() async {
@@ -819,19 +925,23 @@ class _SafetyScreenState extends ConsumerState<SafetyScreen> {
 
   // --- Nearby Safe Places ---
   Widget _buildNearbyPlaces() {
-    final List<Map<String, String>> mockLocations = [
-      {"name": "St. Mary Medical Center", "dist": "0.8 miles", "phone": "555-0199", "type": "Hospital"},
-      {"name": "Central Police Precinct", "dist": "1.2 miles", "phone": "555-0144", "type": "Police Station"},
-      {"name": "SafeHaven Community Center", "dist": "1.5 miles", "phone": "555-0122", "type": "Safe Place"},
-      {"name": "24/7 Downtown Pharmacy", "dist": "1.8 miles", "phone": "555-0188", "type": "Pharmacy"},
-    ];
+    if (_nearbyPlaces.isEmpty) {
+      return const Card(
+        child: Padding(
+          padding: EdgeInsets.all(24.0),
+          child: Center(
+            child: CircularProgressIndicator(color: AppColors.primary),
+          ),
+        ),
+      );
+    }
 
     return ListView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      itemCount: mockLocations.length,
+      itemCount: _nearbyPlaces.length,
       itemBuilder: (context, index) {
-        final loc = mockLocations[index];
+        final loc = _nearbyPlaces[index];
         IconData icon = Icons.local_hospital;
         Color color = AppColors.emergency;
         
