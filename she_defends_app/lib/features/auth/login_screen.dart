@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:she_defends_app/core/theme/app_theme.dart';
+import 'package:she_defends_app/core/network/api_client.dart';
 import 'package:she_defends_app/features/auth/setup_screen.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -15,11 +16,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
 
-  void _handleMockLogin(bool isGoogle) {
-    // In mock mode, we transition directly to the setup wizard
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => const SetupScreen()),
-    );
+  Future<void> _handleMockLogin(bool isGoogle) async {
+    final apiClient = ApiClient();
+    try {
+      await apiClient.post("/auth/login");
+    } catch (e) {
+      debugPrint("Failed to register login event with database: $e");
+    }
+
+    if (mounted) {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const SetupScreen()),
+      );
+    }
   }
 
   @override

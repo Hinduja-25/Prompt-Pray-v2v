@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:she_defends_app/core/providers/app_state.dart';
 import 'package:she_defends_app/core/theme/app_theme.dart';
+import 'package:she_defends_app/core/network/api_client.dart';
 import 'package:she_defends_app/features/dashboard_wrapper.dart';
 
 class SetupScreen extends ConsumerStatefulWidget {
@@ -13,7 +14,7 @@ class SetupScreen extends ConsumerStatefulWidget {
 
 class _SetupScreenState extends ConsumerState<SetupScreen> {
   int _currentStep = 1;
-  final int _totalSteps = 3;
+  final int _totalSteps = 4;
 
   // Controllers
   final _nameController = TextEditingController();
@@ -23,11 +24,32 @@ class _SetupScreenState extends ConsumerState<SetupScreen> {
   final _conditionsController = TextEditingController();
   String _selectedLang = 'English';
 
+  final _heightController = TextEditingController(text: "165");
+  final _weightController = TextEditingController(text: "60");
+  String _selectedActivity = 'Lightly Active';
+  String _selectedDiet = 'Vegetarian';
+  String _selectedGoal = 'General Health';
+
   final List<String> _emergencyContacts = [];
   final _contactController = TextEditingController();
 
   final List<String> _bloodGroups = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
   final List<String> _languages = ['English', 'Spanish', 'Hindi', 'French', 'Arabic'];
+  final List<String> _activityLevels = ['Sedentary', 'Lightly Active', 'Moderately Active', 'Very Active'];
+  final List<String> _dietaryPreferences = ['Vegetarian', 'Vegan', 'Non-Vegetarian'];
+  final List<String> _fitnessGoals = ['Weight Loss', 'Muscle Gain', 'General Health', 'Endurance'];
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _ageController.dispose();
+    _allergiesController.dispose();
+    _conditionsController.dispose();
+    _contactController.dispose();
+    _heightController.dispose();
+    _weightController.dispose();
+    super.dispose();
+  }
 
   void _nextStep() {
     if (_currentStep < _totalSteps) {
@@ -43,7 +65,7 @@ class _SetupScreenState extends ConsumerState<SetupScreen> {
     }
   }
 
-  void _saveProfile() {
+  Future<void> _saveProfile() async {
     if (_nameController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Please fill in your name")),
@@ -59,16 +81,42 @@ class _SetupScreenState extends ConsumerState<SetupScreen> {
       medicalConditions: _conditionsController.text.trim(),
       emergencyContacts: _emergencyContacts,
       preferredLanguage: _selectedLang,
+      height: _heightController.text.trim(),
+      weight: _weightController.text.trim(),
+      activityLevel: _selectedActivity,
+      dietaryPreference: _selectedDiet,
+      fitnessGoal: _selectedGoal,
     );
 
     // Save profile state using Riverpod
     ref.read(userProfileProvider.notifier).updateProfile(profile);
-    ref.read(authProvider.notifier).login();
 
-    // Navigate to Dashboard
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => const DashboardWrapper()),
-    );
+    try {
+      final apiClient = ApiClient();
+      await apiClient.post("/auth/profile", data: {
+        "name": profile.name,
+        "age": profile.age,
+        "bloodGroup": profile.bloodGroup,
+        "allergies": profile.allergies,
+        "medicalConditions": profile.medicalConditions,
+        "preferredLanguage": profile.preferredLanguage,
+        "height": profile.height,
+        "weight": profile.weight,
+        "activityLevel": profile.activityLevel,
+        "dietaryPreference": profile.dietaryPreference,
+        "fitnessGoal": profile.fitnessGoal,
+        "emergencyContacts": profile.emergencyContacts,
+      });
+    } catch (e) {
+      debugPrint("Failed to save profile on onboarding: $e");
+    }
+
+    if (mounted) {
+      ref.read(authProvider.notifier).login();
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const DashboardWrapper()),
+      );
+    }
   }
 
   @override
@@ -213,6 +261,91 @@ class _SetupScreenState extends ConsumerState<SetupScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
+              "Lifestyle & Health Metrics",
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppColors.primary),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              "Please provide your baseline physical metrics and preferences to personalize nutrition and wellness recommendations.",
+              style: TextStyle(color: AppColors.textMuted, fontSize: 14),
+            ),
+            const SizedBox(height: 32),
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text("Height (cm)", style: TextStyle(fontWeight: FontWeight.w600)),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: _heightController,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(hintText: "e.g. 165"),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text("Weight (kg)", style: TextStyle(fontWeight: FontWeight.w600)),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: _weightController,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(hintText: "e.g. 60"),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            const Text("Dietary Preference", style: TextStyle(fontWeight: FontWeight.w600)),
+            const SizedBox(height: 8),
+            DropdownButtonFormField<String>(
+              initialValue: _selectedDiet,
+              decoration: const InputDecoration(),
+              items: _dietaryPreferences.map((diet) => DropdownMenuItem(
+                value: diet,
+                child: Text(diet),
+              )).toList(),
+              onChanged: (val) => setState(() => _selectedDiet = val!),
+            ),
+            const SizedBox(height: 24),
+            const Text("Activity Level", style: TextStyle(fontWeight: FontWeight.w600)),
+            const SizedBox(height: 8),
+            DropdownButtonFormField<String>(
+              initialValue: _selectedActivity,
+              decoration: const InputDecoration(),
+              items: _activityLevels.map((act) => DropdownMenuItem(
+                value: act,
+                child: Text(act),
+              )).toList(),
+              onChanged: (val) => setState(() => _selectedActivity = val!),
+            ),
+            const SizedBox(height: 24),
+            const Text("Fitness Goal", style: TextStyle(fontWeight: FontWeight.w600)),
+            const SizedBox(height: 8),
+            DropdownButtonFormField<String>(
+              initialValue: _selectedGoal,
+              decoration: const InputDecoration(),
+              items: _fitnessGoals.map((goal) => DropdownMenuItem(
+                value: goal,
+                child: Text(goal),
+              )).toList(),
+              onChanged: (val) => setState(() => _selectedGoal = val!),
+            ),
+          ],
+        );
+      case 3:
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
               "Medical Card",
               style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppColors.primary),
             ),
@@ -250,7 +383,7 @@ class _SetupScreenState extends ConsumerState<SetupScreen> {
             ),
           ],
         );
-      case 3:
+      case 4:
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

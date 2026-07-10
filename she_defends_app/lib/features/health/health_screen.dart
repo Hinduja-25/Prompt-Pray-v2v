@@ -4,6 +4,7 @@ import 'package:she_defends_app/core/theme/app_theme.dart';
 import 'package:she_defends_app/features/health/symptom_checker_screen.dart';
 import 'package:she_defends_app/features/health/health_history_screen.dart';
 import 'package:she_defends_app/features/health/medication_manager_screen.dart';
+import 'package:she_defends_app/core/services/notification_service.dart';
 // ScheduleRefillsScreen and AddMedicationSheet are exported from medication_manager_screen.dart
 
 class HealthScreen extends ConsumerStatefulWidget {
@@ -14,6 +15,14 @@ class HealthScreen extends ConsumerStatefulWidget {
 }
 
 class _HealthScreenState extends ConsumerState<HealthScreen> {
+  DateTime _selectedMonthDate = DateTime(2026, 8, 16);
+  int _selectedCalendarDate = 16;
+
+  String _getMonthName(int month) {
+    const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+    return months[month - 1];
+  }
+
   final List<Map<String, dynamic>> _medications = [
     {
       "name": "Vitamin D3",
@@ -106,10 +115,19 @@ class _HealthScreenState extends ConsumerState<HealthScreen> {
                   ],
                 ),
                 GestureDetector(
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const ScheduleRefillsScreen()),
-                  ),
+                  onTap: () async {
+                    final picked = await showDatePicker(
+                      context: context,
+                      initialDate: _selectedMonthDate,
+                      firstDate: DateTime(2020),
+                      lastDate: DateTime(2030),
+                    );
+                    if (picked != null) {
+                      setState(() {
+                        _selectedMonthDate = picked;
+                      });
+                    }
+                  },
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     decoration: BoxDecoration(
@@ -118,12 +136,12 @@ class _HealthScreenState extends ConsumerState<HealthScreen> {
                       border: Border.all(color: AppColors.lavender),
                     ),
                     child: Row(
-                      children: const [
-                        Icon(Icons.calendar_today, size: 14, color: AppColors.primary),
-                        SizedBox(width: 6),
+                      children: [
+                        const Icon(Icons.calendar_today, size: 14, color: AppColors.primary),
+                        const SizedBox(width: 6),
                         Text(
-                          "August",
-                          style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 12),
+                          _getMonthName(_selectedMonthDate.month),
+                          style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 12),
                         ),
                       ],
                     ),
@@ -197,7 +215,7 @@ class _HealthScreenState extends ConsumerState<HealthScreen> {
     final List<Map<String, dynamic>> days = [
       {"day": "M", "date": 14},
       {"day": "T", "date": 15},
-      {"day": "W", "date": 16, "selected": true},
+      {"day": "W", "date": 16},
       {"day": "T", "date": 17},
       {"day": "F", "date": 18},
       {"day": "S", "date": 19},
@@ -207,38 +225,46 @@ class _HealthScreenState extends ConsumerState<HealthScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: days.map((d) {
-        final isSel = d["selected"] ?? false;
-        return Container(
-          width: 44,
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          decoration: BoxDecoration(
-            color: isSel ? Colors.transparent : Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: isSel ? AppColors.primary : const Color(0xFFE5E7EB),
-              width: isSel ? 2 : 1,
+        final date = d["date"] as int;
+        final isSel = date == _selectedCalendarDate;
+        return GestureDetector(
+          onTap: () {
+            setState(() {
+              _selectedCalendarDate = date;
+            });
+          },
+          child: Container(
+            width: 44,
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            decoration: BoxDecoration(
+              color: isSel ? Colors.transparent : Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: isSel ? AppColors.primary : const Color(0xFFE5E7EB),
+                width: isSel ? 2 : 1,
+              ),
             ),
-          ),
-          child: Column(
-            children: [
-              Text(
-                d["day"],
-                style: TextStyle(
-                  color: isSel ? AppColors.primary : AppColors.textMuted,
-                  fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
-                  fontSize: 12,
+            child: Column(
+              children: [
+                Text(
+                  d["day"],
+                  style: TextStyle(
+                    color: isSel ? AppColors.primary : AppColors.textMuted,
+                    fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
+                    fontSize: 12,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                "${d["date"]}",
-                style: TextStyle(
-                  color: AppColors.textDark,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
+                const SizedBox(height: 6),
+                Text(
+                  "$date",
+                  style: const TextStyle(
+                    color: AppColors.textDark,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         );
       }).toList(),
@@ -278,13 +304,37 @@ class _HealthScreenState extends ConsumerState<HealthScreen> {
               ),
             ],
           ),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.1),
-              shape: BoxShape.circle,
+          GestureDetector(
+            onTap: () async {
+              final pickedTime = await showTimePicker(
+                context: context,
+                initialTime: TimeOfDay.now(),
+              );
+              if (pickedTime != null) {
+                // Trigger a simulated notification reminder for testing
+                await NotificationService().showNotification(
+                  id: 101,
+                  title: "💊 Medication Alarm",
+                  body: "Time to take your scheduled dose: Multivitamin!",
+                );
+                
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text("Medication alarm scheduled for ${pickedTime.format(context)}"),
+                    ),
+                  );
+                }
+              }
+            },
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.timer_outlined, color: Colors.white, size: 24),
             ),
-            child: const Icon(Icons.timer_outlined, color: Colors.white, size: 24),
           ),
         ],
       ),

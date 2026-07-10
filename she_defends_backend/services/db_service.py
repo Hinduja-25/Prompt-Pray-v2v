@@ -128,6 +128,7 @@ class MockDatabase:
         self.journals = MockCollection("journals")
         self.contacts = MockCollection("contacts")
         self.recordings = MockCollection("recordings")
+        self.user_profiles = MockCollection("user_profiles")
 
 class DBService:
     def __init__(self):
@@ -166,16 +167,33 @@ class DBService:
 
     # --- User Profile Methods ---
     def get_user_profile(self, uid):
-        return self.db.users.find_one({"uid": uid}, {"_id": 0})
+        return self.db.user_profiles.find_one({"uid": uid}, {"_id": 0})
 
     def save_user_profile(self, uid, profile_data):
         profile_data["uid"] = uid
-        result = self.db.users.update_one(
+        result = self.db.user_profiles.update_one(
             {"uid": uid},
             {"$set": profile_data},
             upsert=True
         )
         return result.modified_count > 0 or result.upserted_id is not None
+
+    def record_user_login(self, uid, email):
+        from datetime import datetime
+        self.db.users.update_one(
+            {"uid": uid},
+            {
+                "$set": {
+                    "email": email,
+                    "last_login": datetime.utcnow().isoformat()
+                },
+                "$setOnInsert": {
+                    "created_at": datetime.utcnow().isoformat()
+                }
+            },
+            upsert=True
+        )
+        return True
 
     # --- Symptom Checker Methods ---
     def add_symptom_log(self, uid, log_data):

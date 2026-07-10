@@ -4,6 +4,14 @@ from services.db_service import db_service
 
 auth_bp = Blueprint("auth", __name__)
 
+@auth_bp.route("/login", methods=["POST"])
+@login_required
+def login_user():
+    uid = request.uid
+    email = request.user_email
+    db_service.record_user_login(uid, email)
+    return jsonify({"message": "Login recorded successfully", "uid": uid, "email": email}), 200
+
 @auth_bp.route("/profile", methods=["GET"])
 @login_required
 def get_profile():

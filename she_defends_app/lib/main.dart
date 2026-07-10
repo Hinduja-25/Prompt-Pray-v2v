@@ -5,13 +5,13 @@ import 'package:she_defends_app/core/theme/app_theme.dart';
 import 'package:she_defends_app/features/auth/onboarding_screen.dart';
 import 'package:she_defends_app/features/auth/login_screen.dart';
 import 'package:she_defends_app/features/dashboard_wrapper.dart';
+import 'package:she_defends_app/core/services/notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Note: Firebase initialization, local notifications setup, and Hive local database 
-  // setup can be fully completed here for production releases. For this review version, 
-  // they are configured with robust fail-safe mock bypasses.
+  // Initialize local notifications on startup
+  await NotificationService().init();
   
   runApp(
     const ProviderScope(

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'dart:async';
 import 'package:she_defends_app/core/providers/app_state.dart';
 import 'package:she_defends_app/core/theme/app_theme.dart';
 import 'package:she_defends_app/core/network/api_client.dart';
@@ -12,6 +13,7 @@ class SafetyScreen extends ConsumerStatefulWidget {
 }
 
 class _SafetyScreenState extends ConsumerState<SafetyScreen> {
+  final _startController = TextEditingController(text: "5th Avenue, Manhattan");
   final _destController = TextEditingController(text: "Corporate Plaza, Midtown");
   final _contactNameController = TextEditingController();
   final _contactPhoneController = TextEditingController();
@@ -21,6 +23,10 @@ class _SafetyScreenState extends ConsumerState<SafetyScreen> {
   final bool _isStealthExpanded = false;
   final _apiClient = ApiClient();
 
+  bool _isRecordingAudio = false;
+  int _recordingSeconds = 0;
+  Timer? _recordingTimer;
+
   @override
   void initState() {
     super.initState();
@@ -29,9 +35,11 @@ class _SafetyScreenState extends ConsumerState<SafetyScreen> {
 
   @override
   void dispose() {
+    _startController.dispose();
     _destController.dispose();
     _contactNameController.dispose();
     _contactPhoneController.dispose();
+    _recordingTimer?.cancel();
     super.dispose();
   }
 
@@ -421,22 +429,107 @@ class _SafetyScreenState extends ConsumerState<SafetyScreen> {
                   ],
                 ),
                 const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
-                    onPressed: () {
-                      _uploadMockAudioClip();
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text("Ambient Audio Recording stashed successfully!")),
-                      );
-                    },
-                    icon: const Icon(Icons.mic, color: AppColors.emergency),
-                    label: const Text("Stash Audio Recording", style: TextStyle(color: AppColors.emergency)),
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: AppColors.emergency),
+                if (_isRecordingAudio) ...[
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.emergency.withValues(alpha: 0.05),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppColors.emergency.withValues(alpha: 0.2)),
+                    ),
+                    child: Column(
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              width: 8,
+                              height: 8,
+                              decoration: BoxDecoration(
+                                color: (_recordingSeconds % 2 == 0) ? Colors.red : Colors.transparent,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              "Recording Ambient Audio... ${_recordingSeconds.toString().padLeft(2, '0')}s",
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.emergency),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        // Waveform animation
+                        SizedBox(
+                          height: 24,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: List.generate(16, (idx) {
+                              final h = 4.0 + (16.0 * (1.0 + (idx % 3 == 0 ? 0.6 : (idx % 2 == 0 ? 0.2 : -0.4))));
+                              return Container(
+                                margin: const EdgeInsets.symmetric(horizontal: 2.0),
+                                width: 3,
+                                height: h,
+                                decoration: BoxDecoration(
+                                  color: AppColors.emergency.withValues(alpha: 0.6),
+                                  borderRadius: BorderRadius.circular(2),
+                                ),
+                              );
+                            }),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            onPressed: () {
+                              _recordingTimer?.cancel();
+                              _uploadMockAudioClip();
+                              setState(() {
+                                _isRecordingAudio = false;
+                                _recordingSeconds = 0;
+                              });
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text("Ambient Audio Recording stashed successfully!")),
+                              );
+                            },
+                            icon: const Icon(Icons.stop),
+                            label: const Text("Stop & Save Recording"),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.red,
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ),
+                ] else ...[
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        setState(() {
+                          _isRecordingAudio = true;
+                          _recordingSeconds = 0;
+                        });
+                        _recordingTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+                          setState(() {
+                            _recordingSeconds++;
+                          });
+                        });
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text("Ambient Audio Recording started...")),
+                        );
+                      },
+                      icon: const Icon(Icons.mic, color: AppColors.emergency),
+                      label: const Text("Stash Audio Recording", style: TextStyle(color: AppColors.emergency)),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: AppColors.emergency),
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -458,29 +551,13 @@ class _SafetyScreenState extends ConsumerState<SafetyScreen> {
             const Text("Start a Monitored Journey", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
             const SizedBox(height: 16),
             
-            // Current GPS Location indicator
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppColors.success.withValues(alpha: 0.06),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.success.withValues(alpha: 0.2)),
-              ),
-              child: const Row(
-                children: [
-                  Icon(Icons.gps_fixed, color: AppColors.success, size: 18),
-                  SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text("Current Location (GPS)", style: TextStyle(fontSize: 10, color: AppColors.success, fontWeight: FontWeight.bold)),
-                        SizedBox(height: 2),
-                        Text("5th Avenue, Manhattan", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                      ],
-                    ),
-                  ),
-                ],
+            const Text("Start Location", style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
+            const SizedBox(height: 6),
+            TextField(
+              controller: _startController,
+              decoration: const InputDecoration(
+                hintText: "Enter start address",
+                prefixIcon: Icon(Icons.gps_fixed, color: AppColors.success),
               ),
             ),
             const SizedBox(height: 16),

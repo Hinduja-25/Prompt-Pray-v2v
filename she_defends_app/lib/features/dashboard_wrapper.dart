@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:async';
+import 'package:flutter/services.dart';
+import 'package:she_defends_app/core/services/notification_service.dart';
 import 'package:she_defends_app/core/providers/app_state.dart';
 import 'package:she_defends_app/core/theme/app_theme.dart';
 import 'package:she_defends_app/core/network/api_client.dart';
@@ -153,11 +155,30 @@ class _DashboardWrapperState extends ConsumerState<DashboardWrapper> {
 
     // Watch SOS state change to initiate timers & backend syncs
     ref.listen<SosState>(sosProvider, (previous, next) {
+      if (next.status == SosStatus.countingDown) {
+        if (previous?.countdownSeconds != next.countdownSeconds) {
+          HapticFeedback.vibrate();
+          SystemSound.play(SystemSoundType.click);
+        }
+      }
+
       if (next.status == SosStatus.countingDown && previous?.status != SosStatus.countingDown) {
         _startSystemTimer();
       } else if (next.status == SosStatus.active && previous?.status != SosStatus.active) {
         _syncSosTriggerWithBackend();
         _startSosElapsedTimer();
+
+        // Play loud alert notification sound
+        NotificationService().showNotification(
+          id: 999,
+          title: "🚨 SOS EMERGENCY ACTIVE",
+          body: "Emergency services and guardians are receiving your live GPS coordinate.",
+        );
+
+        // Vibrate the phone strongly
+        HapticFeedback.heavyImpact();
+        Future.delayed(const Duration(milliseconds: 300), () => HapticFeedback.heavyImpact());
+        Future.delayed(const Duration(milliseconds: 600), () => HapticFeedback.heavyImpact());
       } else if (next.status == SosStatus.idle) {
         _sosElapsedTimer?.cancel();
       }

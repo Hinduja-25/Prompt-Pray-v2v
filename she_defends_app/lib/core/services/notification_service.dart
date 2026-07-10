@@ -23,8 +23,28 @@ class NotificationService {
           debugPrint("Notification clicked: ${response.payload}");
         },
       );
+
+      // Request notification permissions for Android 13+ and iOS dynamically
+      final AndroidFlutterLocalNotificationsPlugin? androidImplementation =
+          _localNotifications.resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin>();
+      if (androidImplementation != null) {
+        await androidImplementation.requestNotificationsPermission();
+      }
+
+      final IOSFlutterLocalNotificationsPlugin? iosImplementation =
+          _localNotifications.resolvePlatformSpecificImplementation<
+              IOSFlutterLocalNotificationsPlugin>();
+      if (iosImplementation != null) {
+        await iosImplementation.requestPermissions(
+          alert: true,
+          badge: true,
+          sound: true,
+        );
+      }
+
       _initialized = true;
-      debugPrint("Local notifications initialized successfully.");
+      debugPrint("Local notifications initialized and permissions requested.");
     } catch (e) {
       debugPrint("Failed to initialize local notifications: $e");
     }
