@@ -120,7 +120,7 @@ class ProfileScreen extends ConsumerWidget {
                 icon: const Icon(Icons.logout, color: AppColors.emergency),
                 label: const Text("Sign Out", style: TextStyle(color: AppColors.emergency)),
                 style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: AppColors.emergency.withOpacity(0.4)),
+                  side: BorderSide(color: AppColors.emergency.withOpacity(0.4)),
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
                 ),

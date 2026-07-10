@@ -1,425 +1,290 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:she_defends_app/core/providers/app_state.dart';
 import 'package:she_defends_app/core/theme/app_theme.dart';
-import 'package:she_defends_app/core/network/api_client.dart';
+import 'package:she_defends_app/features/health/symptom_checker_screen.dart';
+import 'package:she_defends_app/features/health/health_history_screen.dart';
+import 'package:she_defends_app/features/health/medication_manager_screen.dart';
 
-class HealthScreen extends ConsumerStatefulWidget {
-  const HealthScreen({Key? key}) : super(key: key);
-
-  @override
-  ConsumerState<HealthScreen> createState() => _HealthScreenState();
-}
-
-class _HealthScreenState extends ConsumerState<HealthScreen> with SingleTickerProviderStateMixin {
-  late TabController _tabController;
-  final _symptomController = TextEditingController();
-  
-  bool _isAnalyzing = false;
-  Map<String, dynamic>? _analysisResult;
-  final List<Map<String, dynamic>> _historyLogs = [];
-  
-  final _apiClient = ApiClient();
+class HealthScreen extends ConsumerWidget {
+  const HealthScreen({super.key});
 
   @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 3, vsync: this);
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    _symptomController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _runSymptomAnalysis() async {
-    final txt = _symptomController.text.trim();
-    if (txt.isEmpty) return;
-
-    setState(() {
-      _isAnalyzing = true;
-      _analysisResult = null;
-    });
-
-    try {
-      final response = await _apiClient.post("/health/analyze", data: {"symptoms": txt});
-      if (response.statusCode == 200) {
-        final data = response.data as Map<String, dynamic>;
-        setState(() {
-          _analysisResult = data["analysis"];
-          _historyLogs.insert(0, {
-            "symptoms": txt,
-            "timestamp": data["timestamp"],
-            "urgency": _analysisResult?["urgency_level"] ?? "Low"
-          });
-        });
-      }
-    } catch (e) {
-      debugPrint("Symptom analyzer API failed: $e");
-    } finally {
-      setState(() => _isAnalyzing = false);
-    }
-  }
-
-  void _showAddMedicationDialog() {
-    final nameController = TextEditingController();
-    final dosageController = TextEditingController();
-    final timeController = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text("New Medication"),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(controller: nameController, decoration: const InputDecoration(hintText: "Medicine Name")),
-            const SizedBox(height: 12),
-            TextField(controller: dosageController, decoration: const InputDecoration(hintText: "Dosage (e.g. 1 pill)")),
-            const SizedBox(height: 12),
-            TextField(controller: timeController, decoration: const InputDecoration(hintText: "Reminder Time (e.g. 08:00 AM)")),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
-          ElevatedButton(
-            onPressed: () {
-              if (nameController.text.isNotEmpty) {
-                ref.read(medicationProvider.notifier).addMedication(
-                  Medication(
-                    name: nameController.text.trim(),
-                    dosage: dosageController.text.trim(),
-                    time: timeController.text.trim(),
-                  ),
-                );
-                Navigator.pop(context);
-              }
-            },
-            child: const Text("Add"),
-          ),
-        ],
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        title: const Text("Health Record", style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold)),
-        bottom: TabBar(
-          controller: _tabController,
-          labelColor: AppColors.primary,
-          unselectedLabelColor: AppColors.textMuted,
-          indicatorColor: AppColors.primary,
-          tabs: const [
-            Tab(text: "Symptom Checker"),
-            Tab(text: "Medication"),
-            Tab(text: "History"),
-          ],
+        title: const Text(
+          'Health',
+          style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 20),
         ),
       ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          _buildSymptomCheckerTab(),
-          _buildMedicationTab(),
-          _buildHistoryTab(),
-        ],
-      ),
-    );
-  }
-
-  // --- Symptom Checker Tab UI ---
-  Widget _buildSymptomCheckerTab() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text("Describe how you're feeling...", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.primary)),
-          const SizedBox(height: 16),
-          
-          // Symptom query box
-          TextField(
-            controller: _symptomController,
-            maxLines: 4,
-            decoration: const InputDecoration(
-              hintText: "e.g., I have a headache, slight fever, and feel nauseous...",
-            ),
-          ),
-          const SizedBox(height: 16),
-          
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: _isAnalyzing ? null : _runSymptomAnalysis,
-              icon: const Icon(Icons.auto_awesome),
-              label: Text(_isAnalyzing ? "Analyzing symptoms..." : "Analyze Symptoms"),
-            ),
-          ),
-          const SizedBox(height: 28),
-
-          // Diagnostic AI results UI matching Screenshot 4
-          if (_isAnalyzing)
-            const Center(
-              child: Padding(
-                padding: EdgeInsets.symmetric(vertical: 40.0),
-                child: CircularProgressIndicator(color: AppColors.primary),
-              ),
-            )
-          else if (_analysisResult != null) ...[
-            _buildAnalysisResultCard(),
-            const SizedBox(height: 24),
-            _buildVitalsSubcards(),
-            const SizedBox(height: 24),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAnalysisResultCard() {
-    final listConditions = (_analysisResult?["possible_conditions"] as List? ?? []).cast<String>();
-    final listSuggestions = (_analysisResult?["suggestions"] as List? ?? []).cast<String>();
-    final listWarnings = (_analysisResult?["warning_signs"] as List? ?? []).cast<String>();
-    final urgency = _analysisResult?["urgency_level"] ?? "Low";
-    
-    Color urgencyColor = AppColors.success;
-    if (urgency == "Medium") urgencyColor = AppColors.warning;
-    if (urgency == "High") urgencyColor = AppColors.emergency;
-
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        side: const BorderSide(color: AppColors.lavender, width: 2),
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(20.0),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Text(
-                    listConditions.isNotEmpty ? "Possible ${listConditions[0]}" : "Assessment Completed",
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.primary),
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(color: urgencyColor.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
-                  child: Text(
-                    "$urgency - Care suggested",
-                    style: TextStyle(color: urgencyColor, fontWeight: FontWeight.bold, fontSize: 11),
-                  ),
-                ),
-              ],
-            ),
-            const Divider(height: 28),
-            
-            // Suggestions block
-            const Row(
-              children: [
-                Icon(Icons.check_circle_outline, color: AppColors.primaryActive, size: 20),
-                SizedBox(width: 8),
-                Text("Self-care Suggestions", style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.textDark)),
-              ],
-            ),
-            const SizedBox(height: 8),
-            ...listSuggestions.map((sug) => Padding(
-              padding: const EdgeInsets.only(left: 28.0, bottom: 6.0),
-              child: Text("• $sug", style: const TextStyle(color: AppColors.textMuted)),
-            )),
-            const SizedBox(height: 16),
+            // Top greeting
+            _HealthGreeting(),
+            const SizedBox(height: 24),
 
-            // Warning block
-            if (listWarnings.isNotEmpty) ...[
-              Container(
-                decoration: BoxDecoration(
-                  color: AppColors.emergency.withOpacity(0.04),
-                  border: Border.all(color: AppColors.emergency.withOpacity(0.2)),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Row(
-                      children: [
-                        Icon(Icons.warning_amber_rounded, color: AppColors.emergency, size: 18),
-                        SizedBox(width: 8),
-                        Text("When to see a doctor", style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.emergency)),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    ...listWarnings.map((warn) => Padding(
-                      padding: const EdgeInsets.only(left: 26.0, bottom: 4.0),
-                      child: Text("• $warn", style: const TextStyle(color: AppColors.textDark, fontSize: 13)),
-                    )),
-                  ],
-                ),
+            // 3 main modules
+            const Text(
+              'Health Modules',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.textDark),
+            ),
+            const SizedBox(height: 14),
+            _ModuleCard(
+              icon: Icons.medical_services_rounded,
+              title: 'AI Symptom Checker',
+              subtitle: 'Describe symptoms · Voice input · AI diagnosis',
+              gradient: const [Color(0xFF4C1D95), Color(0xFF7C3AED)],
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const SymptomCheckerScreen()),
               ),
-              const SizedBox(height: 16),
-            ],
-
-            Text(
-              _analysisResult?["disclaimer"] ?? "",
-              style: const TextStyle(fontSize: 11, color: AppColors.textMuted, fontStyle: FontStyle.italic),
             ),
+            const SizedBox(height: 12),
+            _ModuleCard(
+              icon: Icons.history_rounded,
+              title: 'Health History',
+              subtitle: 'Timeline · Past reports · Detailed view',
+              gradient: const [Color(0xFF0F766E), Color(0xFF14B8A6)],
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const HealthHistoryScreen()),
+              ),
+            ),
+            const SizedBox(height: 12),
+            _ModuleCard(
+              icon: Icons.medication_rounded,
+              title: 'Medication Manager',
+              subtitle: 'Daily schedule · Reminders · Refill tracking',
+              gradient: const [Color(0xFFB45309), Color(0xFFF59E0B)],
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const MedicationManagerScreen()),
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            // Quick vitals
+            const Text(
+              'Quick Vitals',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.textDark),
+            ),
+            const SizedBox(height: 12),
+            _VitalsRow(),
           ],
         ),
       ),
     );
   }
+}
 
-  Widget _buildVitalsSubcards() {
-    return Row(
-      children: [
-        Expanded(
-          child: Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: const [
-                  Icon(Icons.favorite, color: AppColors.emergency, size: 20),
-                  SizedBox(height: 8),
-                  Text("Heart Rate", style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
-                  Text("72 bpm", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-                ],
-              ),
+class _HealthGreeting extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFFF3F0FF), Color(0xFFEDE9FE)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.lavender),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: const [
+                Text(
+                  'Your Health Dashboard',
+                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppColors.primary),
+                ),
+                SizedBox(height: 6),
+                Text(
+                  'Monitor your well-being, track medications, and get AI-powered health insights.',
+                  style: TextStyle(color: AppColors.textMuted, fontSize: 13, height: 1.5),
+                ),
+              ],
             ),
           ),
+          const SizedBox(width: 12),
+          const Icon(Icons.favorite_rounded, color: AppColors.primary, size: 40),
+        ],
+      ),
+    );
+  }
+}
+
+class _ModuleCard extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final List<Color> gradient;
+  final VoidCallback onTap;
+
+  const _ModuleCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.gradient,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(colors: gradient, begin: Alignment.topLeft, end: Alignment.bottomRight),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: gradient.first.withOpacity(0.3),
+              blurRadius: 16,
+              offset: const Offset(0, 6),
+            ),
+          ],
         ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Icon(icon, color: Colors.white, size: 28),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                children: const [
-                  Icon(Icons.nightlight_round, color: AppColors.primaryActive, size: 20),
-                  SizedBox(height: 8),
-                  Text("Sleep Quality", style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
-                  Text("Good", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(color: Colors.white70, fontSize: 12),
+                  ),
                 ],
               ),
             ),
+            const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white70, size: 16),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _VitalsRow extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: const [
+        Expanded(
+          child: _VitalCard(
+            icon: Icons.favorite_rounded,
+            label: 'Heart Rate',
+            value: '72',
+            unit: 'bpm',
+            color: Color(0xFFEF4444),
+            bgColor: Color(0xFFFFF5F5),
+          ),
+        ),
+        SizedBox(width: 12),
+        Expanded(
+          child: _VitalCard(
+            icon: Icons.nightlight_round,
+            label: 'Sleep',
+            value: '7.5',
+            unit: 'hrs',
+            color: Color(0xFF4C1D95),
+            bgColor: Color(0xFFF5F3FF),
+          ),
+        ),
+        SizedBox(width: 12),
+        Expanded(
+          child: _VitalCard(
+            icon: Icons.water_drop_rounded,
+            label: 'Hydration',
+            value: '1.8',
+            unit: 'L',
+            color: Color(0xFF0EA5E9),
+            bgColor: Color(0xFFF0F9FF),
           ),
         ),
       ],
     );
   }
+}
 
-  // --- Medication Tab UI ---
-  Widget _buildMedicationTab() {
-    final medications = ref.watch(medicationProvider);
+class _VitalCard extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final String unit;
+  final Color color;
+  final Color bgColor;
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      floatingActionButton: FloatingActionButton(
-        onPressed: _showAddMedicationDialog,
-        backgroundColor: AppColors.primary,
-        shape: const CircleBorder(),
-        child: const Icon(Icons.add, color: Colors.white),
+  const _VitalCard({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.unit,
+    required this.color,
+    required this.bgColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withOpacity(0.2)),
       ),
-      body: medications.isEmpty
-          ? const Center(child: Text("No medications added yet", style: TextStyle(color: AppColors.textMuted)))
-          : ListView.builder(
-              padding: const EdgeInsets.all(24),
-              itemCount: medications.length,
-              itemBuilder: (context, index) {
-                final med = medications[index];
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  child: ListTile(
-                    leading: CircleAvatar(
-                      backgroundColor: med.isTaken ? AppColors.success.withOpacity(0.1) : AppColors.lavender,
-                      child: Icon(
-                        Icons.medication,
-                        color: med.isTaken ? AppColors.success : AppColors.primary,
-                      ),
-                    ),
-                    title: Text(med.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                    subtitle: Text("${med.dosage} • Scheduled: ${med.time}"),
-                    trailing: Checkbox(
-                      value: med.isTaken,
-                      activeColor: AppColors.success,
-                      onChanged: (val) {
-                        ref.read(medicationProvider.notifier).toggleTaken(index);
-                      },
-                    ),
-                  ),
-                );
-              },
-            ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: color, size: 20),
+          const SizedBox(height: 8),
+          Text(
+            label,
+            style: TextStyle(color: color.withOpacity(0.7), fontSize: 11),
+          ),
+          const SizedBox(height: 2),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(value, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: color)),
+              const SizedBox(width: 2),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 2),
+                child: Text(unit, style: TextStyle(fontSize: 10, color: color.withOpacity(0.7))),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
-  }
-
-  // --- History Tab UI ---
-  Widget _buildHistoryTab() {
-    final logs = _historyLogs;
-
-    return logs.isEmpty
-        ? const Center(child: Text("No health entries logged yet", style: TextStyle(color: AppColors.textMuted)))
-        : ListView.builder(
-            padding: const EdgeInsets.all(24),
-            itemCount: logs.length,
-            itemBuilder: (context, index) {
-              final log = logs[index];
-              Color uColor = AppColors.success;
-              if (log["urgency"] == "Medium") uColor = AppColors.warning;
-              if (log["urgency"] == "High") uColor = AppColors.emergency;
-
-              return Card(
-                margin: const EdgeInsets.only(bottom: 12),
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 8,
-                        height: 48,
-                        decoration: BoxDecoration(
-                          color: uColor,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              log["symptoms"],
-                              style: const TextStyle(fontWeight: FontWeight.bold),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              "Urgency: ${log["urgency"]} • ${log["timestamp"].toString().split('T')[0]}",
-                              style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const Icon(Icons.chevron_right, color: AppColors.textMuted),
-                    ],
-                  ),
-                ),
-              );
-            },
-          );
   }
 }

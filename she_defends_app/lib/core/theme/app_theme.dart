@@ -55,7 +55,7 @@ class AppTheme {
           color: AppColors.textMuted,
         ),
       ),
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: Colors.white,
         elevation: 0,
         shape: RoundedRectangleBorder(
