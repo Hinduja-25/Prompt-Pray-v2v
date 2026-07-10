@@ -22,6 +22,7 @@ def add_mood():
     }
     
     db_service.add_mood_log(uid, mood_entry)
+    mood_entry.pop("_id", None)  # Remove MongoDB ObjectId to prevent JSON serialization error
     return jsonify({"message": "Mood logged successfully", "mood": mood_entry}), 200
 
 @wellness_bp.route("/moods", methods=["GET"])
