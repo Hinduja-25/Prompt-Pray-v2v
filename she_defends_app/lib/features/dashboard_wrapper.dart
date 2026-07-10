@@ -41,6 +41,29 @@ class _DashboardWrapperState extends ConsumerState<DashboardWrapper> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _syncContactsFromBackend();
+  }
+
+  Future<void> _syncContactsFromBackend() async {
+    try {
+      final res = await _apiClient.get("/safety/contacts");
+      if (res.data is List) {
+        final list = (res.data as List).map((c) => EmergencyContact(
+          id: c["id"] ?? "",
+          name: c["name"] ?? "",
+          phone: c["phone"] ?? "",
+          category: c["category"] ?? "Family",
+        )).toList();
+        ref.read(emergencyContactsProvider.notifier).setContacts(list);
+      }
+    } catch (e) {
+      debugPrint("Failed to load contacts on wrapper init: $e");
+    }
+  }
+
+  @override
   void dispose() {
     _systemTimer?.cancel();
     _sosElapsedTimer?.cancel();

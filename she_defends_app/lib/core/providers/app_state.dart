@@ -409,11 +409,7 @@ class EmergencyContact {
 }
 
 class EmergencyContactsNotifier extends StateNotifier<List<EmergencyContact>> {
-  EmergencyContactsNotifier() : super([
-    EmergencyContact(id: "1", name: "Mom", phone: "555-0101", category: "Family"),
-    EmergencyContact(id: "2", name: "Dad", phone: "555-0102", category: "Family"),
-    EmergencyContact(id: "3", name: "Sarah (Bestie)", phone: "555-0103", category: "Friends"),
-  ]);
+  EmergencyContactsNotifier() : super([]);
 
   void setContacts(List<EmergencyContact> list) {
     state = list;
