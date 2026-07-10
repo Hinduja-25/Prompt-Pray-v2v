@@ -18,7 +18,7 @@ class NotificationService {
 
     try {
       await _localNotifications.initialize(
-        initializationSettings: initSettings,
+        settings: initSettings,
         onDidReceiveNotificationResponse: (NotificationResponse response) {
           debugPrint("Notification clicked: ${response.payload}");
         },
