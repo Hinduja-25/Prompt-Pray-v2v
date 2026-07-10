@@ -19,10 +19,39 @@ class MockCursor:
     def __getitem__(self, index):
         return self.data[index]
 
+import json
+import os
+
 class MockCollection:
-    def __init__(self, name):
+    def __init__(self, name, db_file):
         self.name = name
-        self.data = []
+        self.db_file = db_file
+        self.data = self._load_data()
+
+    def _load_data(self):
+        if not os.path.exists(self.db_file):
+            return []
+        try:
+            with open(self.db_file, 'r') as f:
+                db_data = json.load(f)
+                return db_data.get(self.name, [])
+        except Exception:
+            return []
+
+    def _save_data(self):
+        db_data = {}
+        if os.path.exists(self.db_file):
+            try:
+                with open(self.db_file, 'r') as f:
+                    db_data = json.load(f)
+            except Exception:
+                pass
+        db_data[self.name] = self.data
+        try:
+            with open(self.db_file, 'w') as f:
+                json.dump(db_data, f, indent=4)
+        except Exception:
+            pass
 
     def find_one(self, filter, projection=None):
         for item in self.data:
@@ -63,6 +92,7 @@ class MockCollection:
         if "_id" not in document:
             document["_id"] = uuid.uuid4().hex
         self.data.append(dict(document))
+        self._save_data()
         class Result:
             inserted_id = document["_id"]
         return Result()
@@ -84,6 +114,8 @@ class MockCollection:
             new_item = dict(filter)
             new_item.update(set_data)
             self.data.append(new_item)
+        
+        self._save_data()
         class Result:
             modified_count = 1 if found else 0
             upserted_id = None
@@ -102,6 +134,7 @@ class MockCollection:
                 break
         if found_idx != -1:
             self.data.pop(found_idx)
+            self._save_data()
             class Result:
                 deleted_count = 1
             return Result()
@@ -110,25 +143,35 @@ class MockCollection:
         return Result()
 
     def delete_many(self, filter):
+        original_len = len(self.data)
         self.data = [item for item in self.data if not all(item.get(k) == v for k, v in filter.items())]
+        if len(self.data) != original_len:
+            self._save_data()
         class Result:
             deleted_count = 1
         return Result()
 
     def insert_many(self, documents):
         for doc in documents:
-            self.insert_one(doc)
+            import uuid
+            if "_id" not in doc:
+                doc["_id"] = uuid.uuid4().hex
+            self.data.append(dict(doc))
+        self._save_data()
         return True
 
 class MockDatabase:
     def __init__(self):
-        self.users = MockCollection("users")
-        self.health_history = MockCollection("health_history")
-        self.medications = MockCollection("medications")
-        self.journals = MockCollection("journals")
-        self.contacts = MockCollection("contacts")
-        self.recordings = MockCollection("recordings")
-        self.user_profiles = MockCollection("user_profiles")
+        self.db_file = "local_mock_db.json"
+        self.users = MockCollection("users", self.db_file)
+        self.health_history = MockCollection("health_history", self.db_file)
+        self.medications = MockCollection("medications", self.db_file)
+        self.journals = MockCollection("journals", self.db_file)
+        self.contacts = MockCollection("contacts", self.db_file)
+        self.recordings = MockCollection("recordings", self.db_file)
+        self.user_profiles = MockCollection("user_profiles", self.db_file)
+        self.journeys = MockCollection("journeys", self.db_file)
+        self.moods = MockCollection("moods", self.db_file)
 
 class DBService:
     def __init__(self):

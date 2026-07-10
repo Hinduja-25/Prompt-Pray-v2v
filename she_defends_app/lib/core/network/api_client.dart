@@ -10,6 +10,9 @@ class ApiClient {
       ? 'http://10.0.2.2:5000/api'  // Android Emulator loopback
       : 'http://localhost:5000/api'; // iOS/Web/Desktop loopback
 
+  // Used for development when Firebase is bypassed
+  static String mockEmail = "mock_user";
+
   ApiClient() : dio = Dio(BaseOptions(
     baseUrl: _baseUrl,
     connectTimeout: const Duration(seconds: 15),
@@ -29,11 +32,11 @@ class ApiClient {
             options.headers['Authorization'] = 'Bearer $token';
           } else {
             // Fallback mock token for development mode
-            options.headers['Authorization'] = 'Bearer mock_sarah';
+            options.headers['Authorization'] = 'Bearer mock_$mockEmail';
           }
         } catch (e) {
           // If Firebase is not initialized, inject mock token
-          options.headers['Authorization'] = 'Bearer mock_sarah';
+          options.headers['Authorization'] = 'Bearer mock_$mockEmail';
         }
         return handler.next(options);
       },

@@ -33,10 +33,10 @@ def login_required(f):
         token = auth_header.split("Bearer ")[1]
         
         if not firebase_initialized or token.startswith("mock_"):
-            # Mock mode active: extract user id from mock token (e.g. mock_sarah -> sarah)
-            uid = token.replace("mock_", "") if token.startswith("mock_") else "sarah_mock_uid"
+            # Mock mode active: extract user id from mock token (e.g. mock_user -> user)
+            uid = token.replace("mock_", "") if token.startswith("mock_") else "default_mock_uid"
             request.uid = uid
-            request.user_email = f"{uid}@example.com"
+            request.user_email = f"{uid}@example.com" if not "@" in uid else uid
             return f(*args, **kwargs)
             
         try:

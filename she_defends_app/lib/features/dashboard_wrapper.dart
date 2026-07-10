@@ -12,6 +12,9 @@ import 'package:she_defends_app/features/safety/safety_screen.dart';
 import 'package:she_defends_app/features/wellness/wellness_screen.dart';
 import 'package:she_defends_app/features/profile/profile_screen.dart';
 import 'package:she_defends_app/features/assistant/assistant_chat_sheet.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:audioplayers/audioplayers.dart';
 
 class DashboardWrapper extends ConsumerStatefulWidget {
   const DashboardWrapper({super.key});
@@ -153,8 +156,28 @@ class _DashboardWrapperState extends ConsumerState<DashboardWrapper> {
     final stealthState = ref.watch(stealthProvider);
     final fakeCallState = ref.watch(fakeCallProvider);
 
+    // Audio player for sirens and ringtones
+    final player = AudioPlayer();
+
+    Future<String> getCurrentLocation() async {
+      try {
+        bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+        if (!serviceEnabled) return "GPS Disabled";
+        LocationPermission permission = await Geolocator.checkPermission();
+        if (permission == LocationPermission.denied) {
+          permission = await Geolocator.requestPermission();
+          if (permission == LocationPermission.denied) return "Location Denied";
+        }
+        if (permission == LocationPermission.deniedForever) return "Location Denied Forever";
+        Position position = await Geolocator.getCurrentPosition();
+        return "${position.latitude},${position.longitude}";
+      } catch(e) {
+        return "Unknown";
+      }
+    }
+
     // Watch SOS state change to initiate timers & backend syncs
-    ref.listen<SosState>(sosProvider, (previous, next) {
+    ref.listen<SosState>(sosProvider, (previous, next) async {
       if (next.status == SosStatus.countingDown) {
         if (previous?.countdownSeconds != next.countdownSeconds) {
           HapticFeedback.vibrate();
@@ -165,8 +188,29 @@ class _DashboardWrapperState extends ConsumerState<DashboardWrapper> {
       if (next.status == SosStatus.countingDown && previous?.status != SosStatus.countingDown) {
         _startSystemTimer();
       } else if (next.status == SosStatus.active && previous?.status != SosStatus.active) {
-        _syncSosTriggerWithBackend();
         _startSosElapsedTimer();
+
+        // 1. Get real location
+        String location = await getCurrentLocation();
+        
+        // 2. Play loud police siren
+        await player.setReleaseMode(ReleaseMode.loop);
+        await player.play(UrlSource('https://actions.google.com/sounds/v1/alarms/police_siren.ogg'));
+
+        // 3. Send SMS to contacts
+        final contacts = ref.read(emergencyContactsProvider);
+        if (contacts.isNotEmpty) {
+           List<String> phones = contacts.map((c) => c.phone).toList();
+           String msg = "SOS! I may be in danger. My live location: https://maps.google.com/?q=$location Please help!";
+           String uriStr = "sms:${phones.join(',')}?body=${Uri.encodeComponent(msg)}";
+           if (await canLaunchUrl(Uri.parse(uriStr))) {
+             await launchUrl(Uri.parse(uriStr));
+           }
+        }
+
+        // update state with real location
+        ref.read(sosProvider.notifier).state = ref.read(sosProvider).copyWith(location: location);
+        _syncSosTriggerWithBackend();
 
         // Play loud alert notification sound
         NotificationService().showNotification(
@@ -179,15 +223,23 @@ class _DashboardWrapperState extends ConsumerState<DashboardWrapper> {
         HapticFeedback.heavyImpact();
         Future.delayed(const Duration(milliseconds: 300), () => HapticFeedback.heavyImpact());
         Future.delayed(const Duration(milliseconds: 600), () => HapticFeedback.heavyImpact());
-      } else if (next.status == SosStatus.idle) {
+      } else if (next.status == SosStatus.idle && previous?.status == SosStatus.active) {
         _sosElapsedTimer?.cancel();
+        await player.stop();
       }
     });
 
     // Watch Fake Call state change to start countdown timer
-    ref.listen<FakeCallState>(fakeCallProvider, (previous, next) {
+    ref.listen<FakeCallState>(fakeCallProvider, (previous, next) async {
       if (next.status == FakeCallStatus.scheduled && previous?.status != FakeCallStatus.scheduled) {
         _startSystemTimer();
+      } else if (next.status == FakeCallStatus.ringing && previous?.status != FakeCallStatus.ringing) {
+        // Play ringtone
+        await player.setReleaseMode(ReleaseMode.loop);
+        await player.play(UrlSource('https://actions.google.com/sounds/v1/alarms/digital_watch_alarm_long.ogg'));
+      } else if ((next.status == FakeCallStatus.active || next.status == FakeCallStatus.idle) && previous?.status == FakeCallStatus.ringing) {
+        // Stop ringtone
+        await player.stop();
       }
     });
 

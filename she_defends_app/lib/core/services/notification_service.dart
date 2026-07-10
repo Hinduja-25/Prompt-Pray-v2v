@@ -93,9 +93,16 @@ class NotificationService {
     required String body,
     required DateTime scheduledTime,
   }) async {
-    // Note: Standard scheduling uses timezone packages.
-    // For simplicity, we trigger standard show call if time is immediate, 
-    // or log simulated notifications within our app's mock stream.
-    debugPrint("Scheduled medicine notification ID $id at $scheduledTime");
+    final now = DateTime.now();
+    if (scheduledTime.isBefore(now)) return;
+
+    final duration = scheduledTime.difference(now);
+    
+    // For prototype purposes, use a Dart Timer to show the notification when the time arrives
+    Future.delayed(duration, () {
+      showNotification(id: id, title: title, body: body);
+    });
+
+    debugPrint("Scheduled medicine notification ID $id at $scheduledTime (in ${duration.inSeconds} seconds)");
   }
 }

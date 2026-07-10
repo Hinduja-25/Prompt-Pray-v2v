@@ -95,13 +95,13 @@ class _SafetyScreenState extends ConsumerState<SafetyScreen> {
     }
 
     try {
-      await _apiClient.post("/safety/contacts", data: data);
-      // final savedId = res.data["id"] ?? editId ?? DateTime.now().millisecondsSinceEpoch.toString();
+      final res = await _apiClient.post("/safety/contacts", data: data);
+      final savedId = res.data["id"] ?? editId ?? DateTime.now().millisecondsSinceEpoch.toString();
       
       if (editId != null) {
         ref.read(emergencyContactsProvider.notifier).editContact(editId, name, phone, _selectedContactCategory);
       } else {
-        ref.read(emergencyContactsProvider.notifier).addContact(name, phone, _selectedContactCategory);
+        ref.read(emergencyContactsProvider.notifier).addContact(savedId, name, phone, _selectedContactCategory);
       }
       
       _contactNameController.clear();

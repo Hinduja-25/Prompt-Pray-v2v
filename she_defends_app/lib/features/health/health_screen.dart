@@ -7,6 +7,8 @@ import 'package:she_defends_app/features/health/medication_manager_screen.dart';
 import 'package:she_defends_app/core/services/notification_service.dart';
 // ScheduleRefillsScreen and AddMedicationSheet are exported from medication_manager_screen.dart
 
+import 'package:she_defends_app/core/network/api_client.dart';
+
 class HealthScreen extends ConsumerStatefulWidget {
   const HealthScreen({super.key});
 
@@ -15,30 +17,44 @@ class HealthScreen extends ConsumerStatefulWidget {
 }
 
 class _HealthScreenState extends ConsumerState<HealthScreen> {
-  DateTime _selectedMonthDate = DateTime(2026, 8, 16);
-  int _selectedCalendarDate = 16;
+  DateTime _selectedMonthDate = DateTime.now();
+  int _selectedCalendarDate = DateTime.now().day;
+  final _apiClient = ApiClient();
+  List<Map<String, dynamic>> _medications = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchMedications();
+  }
+
+  Future<void> _fetchMedications() async {
+    try {
+      final res = await _apiClient.get("/health/medications");
+      if (res.data is List) {
+        setState(() {
+          _medications = List<Map<String, dynamic>>.from(res.data);
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _syncMedications() async {
+    try {
+      await _apiClient.post("/health/medications/sync", data: _medications);
+    } catch (e) {
+      debugPrint("Failed to sync medications: $e");
+    }
+  }
 
   String _getMonthName(int month) {
     const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
     return months[month - 1];
   }
-
-  final List<Map<String, dynamic>> _medications = [
-    {
-      "name": "Vitamin D3",
-      "dosage": "1000 IU",
-      "time": "08:00 AM",
-      "taken": true,
-      "type": "pill"
-    },
-    {
-      "name": "Iron Supplement",
-      "dosage": "65 mg",
-      "time": "08:30 AM",
-      "taken": false,
-      "type": "bottle"
-    }
-  ];
 
   void _addMedication(Map<String, dynamic> med) {
     setState(() {
@@ -50,6 +66,7 @@ class _HealthScreenState extends ConsumerState<HealthScreen> {
         "type": "pill",
       });
     });
+    _syncMedications();
   }
 
   @override
@@ -165,7 +182,7 @@ class _HealthScreenState extends ConsumerState<HealthScreen> {
                 Icon(Icons.wb_sunny_outlined, color: Colors.orange, size: 18),
                 SizedBox(width: 6),
                 Text(
-                  "Morning",
+                  "Today's Schedule",
                   style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.textMuted, fontSize: 13),
                 ),
               ],
@@ -173,7 +190,15 @@ class _HealthScreenState extends ConsumerState<HealthScreen> {
             const SizedBox(height: 12),
 
             // Medications List
-            ..._medications.map((med) => _buildMedCard(med)),
+            if (_isLoading)
+              const Center(child: CircularProgressIndicator())
+            else if (_medications.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 20),
+                child: Text("No medications scheduled today.", style: TextStyle(color: AppColors.textMuted)),
+              )
+            else
+              ..._medications.map((med) => _buildMedCard(med)),
 
             const SizedBox(height: 24),
             // Button to open Add Medication Screen
@@ -294,12 +319,12 @@ class _HealthScreenState extends ConsumerState<HealthScreen> {
               ),
               SizedBox(height: 6),
               Text(
-                "02:45 hours",
+                "Upcoming",
                 style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
               ),
               SizedBox(height: 4),
               Text(
-                "Next: Multivitamin at 1:00 PM",
+                "Schedule your next reminder",
                 style: TextStyle(color: Colors.white70, fontSize: 12),
               ),
             ],
@@ -311,11 +336,17 @@ class _HealthScreenState extends ConsumerState<HealthScreen> {
                 initialTime: TimeOfDay.now(),
               );
               if (pickedTime != null) {
-                // Trigger a simulated notification reminder for testing
-                await NotificationService().showNotification(
+                final now = DateTime.now();
+                var scheduledTime = DateTime(now.year, now.month, now.day, pickedTime.hour, pickedTime.minute);
+                if (scheduledTime.isBefore(now)) {
+                  scheduledTime = scheduledTime.add(const Duration(days: 1));
+                }
+
+                await NotificationService().scheduleMedicationReminder(
                   id: 101,
                   title: "💊 Medication Alarm",
                   body: "Time to take your scheduled dose: Multivitamin!",
+                  scheduledTime: scheduledTime,
                 );
                 
                 if (mounted) {
@@ -390,6 +421,7 @@ class _HealthScreenState extends ConsumerState<HealthScreen> {
               setState(() {
                 med["taken"] = !isTaken;
               });
+              _syncMedications();
             },
             child: Container(
               width: 36,

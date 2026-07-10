@@ -17,9 +17,57 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   bool _obscurePassword = true;
 
   Future<void> _handleMockLogin(bool isGoogle) async {
+    final email = _emailController.text.trim();
+    if (email.isEmpty && !isGoogle) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please enter your email")),
+      );
+      return;
+    }
+    
+    // Set global mock token (for development) if Firebase is not working
+    // In a real app we'd use Firebase Auth. Here we just set a static variable for ApiClient to use.
+    ApiClient.mockEmail = email.isNotEmpty ? email : "google_user";
+
     final apiClient = ApiClient();
     try {
       await apiClient.post("/auth/login");
+      
+      // Fetch profile to see if setup is done
+      final profileResp = await apiClient.get("/auth/profile");
+      if (profileResp.statusCode == 200 && profileResp.data != null) {
+        final data = profileResp.data;
+        if (data['name'] != null && data['name'].toString().isNotEmpty) {
+          // Profile exists, go to Dashboard
+          if (mounted) {
+            ref.read(authProvider.notifier).login();
+            
+            // Also restore profile in Riverpod
+            try {
+              final p = UserProfile(
+                name: data['name'] ?? '',
+                age: data['age']?.toString() ?? '',
+                bloodGroup: data['bloodGroup'] ?? 'O+',
+                allergies: data['allergies'] ?? '',
+                medicalConditions: data['medicalConditions'] ?? '',
+                preferredLanguage: data['preferredLanguage'] ?? 'English',
+                height: data['height']?.toString() ?? '165',
+                weight: data['weight']?.toString() ?? '60',
+                activityLevel: data['activityLevel'] ?? 'Lightly Active',
+                dietaryPreference: data['dietaryPreference'] ?? 'Vegetarian',
+                fitnessGoal: data['fitnessGoal'] ?? 'General Health',
+                emergencyContacts: List<String>.from(data['emergencyContacts'] ?? []),
+              );
+              ref.read(userProfileProvider.notifier).updateProfile(p);
+            } catch(e) {}
+
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(builder: (_) => const DashboardWrapper()),
+            );
+          }
+          return;
+        }
+      }
     } catch (e) {
       debugPrint("Failed to register login event with database: $e");
     }

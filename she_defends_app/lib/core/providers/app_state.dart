@@ -415,9 +415,9 @@ class EmergencyContactsNotifier extends StateNotifier<List<EmergencyContact>> {
     state = list;
   }
 
-  void addContact(String name, String phone, String category) {
+  void addContact(String id, String name, String phone, String category) {
     final contact = EmergencyContact(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      id: id,
       name: name,
       phone: phone,
       category: category,
