@@ -66,23 +66,79 @@ class _SetupScreenState extends ConsumerState<SetupScreen> {
   }
 
   Future<void> _saveProfile() async {
-    if (_nameController.text.trim().isEmpty) {
+    final name = _nameController.text.trim();
+    final ageText = _ageController.text.trim();
+    final heightText = _heightController.text.trim();
+    final weightText = _weightController.text.trim();
+
+    if (name.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Please fill in your name")),
       );
       return;
     }
 
+    // Age validation (18+)
+    if (ageText.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please enter your age")),
+      );
+      return;
+    }
+    final int? age = int.tryParse(ageText);
+    if (age == null || age <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please enter a valid age")),
+      );
+      return;
+    }
+    if (age < 18) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("SheDefends is designed for women aged 18 and older. Please enter a valid age of 18 or above.")),
+      );
+      return;
+    }
+
+    // Height validation (100 - 250 cm)
+    if (heightText.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please enter your height")),
+      );
+      return;
+    }
+    final double? height = double.tryParse(heightText);
+    if (height == null || height < 100 || height > 250) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please enter a valid height between 100 and 250 cm")),
+      );
+      return;
+    }
+
+    // Weight validation (30 - 200 kg)
+    if (weightText.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please enter your weight")),
+      );
+      return;
+    }
+    final double? weight = double.tryParse(weightText);
+    if (weight == null || weight < 30 || weight > 200) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please enter a valid weight between 30 and 200 kg")),
+      );
+      return;
+    }
+
     final profile = UserProfile(
-      name: _nameController.text.trim(),
-      age: _ageController.text.trim(),
+      name: name,
+      age: ageText,
       bloodGroup: _selectedBlood,
       allergies: _allergiesController.text.trim(),
       medicalConditions: _conditionsController.text.trim(),
       emergencyContacts: _emergencyContacts,
       preferredLanguage: _selectedLang,
-      height: _heightController.text.trim(),
-      weight: _weightController.text.trim(),
+      height: heightText,
+      weight: weightText,
       activityLevel: _selectedActivity,
       dietaryPreference: _selectedDiet,
       fitnessGoal: _selectedGoal,

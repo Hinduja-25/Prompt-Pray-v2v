@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:she_defends_app/core/theme/app_theme.dart';
 import 'package:she_defends_app/core/network/api_client.dart';
 import 'package:she_defends_app/features/auth/setup_screen.dart';
+import 'package:she_defends_app/core/providers/app_state.dart';
+import 'package:she_defends_app/features/dashboard_wrapper.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -16,19 +18,61 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
 
+  // Sign In / Sign Up state and validations
+  bool _isSignUp = false;
+  final RegExp _emailRegex = RegExp(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$");
+
   Future<void> _handleMockLogin(bool isGoogle) async {
     final email = _emailController.text.trim();
-    if (email.isEmpty && !isGoogle) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please enter your email")),
-      );
-      return;
+    final password = _passwordController.text.trim();
+
+    if (!isGoogle) {
+      if (email.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Please enter your email")),
+        );
+        return;
+      }
+      if (!_emailRegex.hasMatch(email)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Please enter a valid email address")),
+        );
+        return;
+      }
+      if (password.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Please enter your password")),
+        );
+        return;
+      }
+      if (password.length < 6) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Password must be at least 6 characters long")),
+        );
+        return;
+      }
     }
-    
-    // Set global mock token (for development) if Firebase is not working
-    // In a real app we'd use Firebase Auth. Here we just set a static variable for ApiClient to use.
+
+    // Set global mock token (for development)
     ApiClient.mockEmail = email.isNotEmpty ? email : "google_user";
 
+    // If it's a new signup, always redirect to SetupScreen for Profile Completion
+    if (_isSignUp) {
+      final apiClient = ApiClient();
+      try {
+        await apiClient.post("/auth/login");
+      } catch (e) {
+        debugPrint("Failed to register signup login event: $e");
+      }
+      if (mounted) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const SetupScreen()),
+        );
+      }
+      return;
+    }
+
+    // Otherwise, check if user already has a completed profile
     final apiClient = ApiClient();
     try {
       await apiClient.post("/auth/login");
@@ -38,11 +82,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       if (profileResp.statusCode == 200 && profileResp.data != null) {
         final data = profileResp.data;
         if (data['name'] != null && data['name'].toString().isNotEmpty) {
-          // Profile exists, go to Dashboard
+          // Profile exists, go directly to Home Dashboard
           if (mounted) {
             ref.read(authProvider.notifier).login();
             
-            // Also restore profile in Riverpod
+            // Restore profile in Riverpod
             try {
               final p = UserProfile(
                 name: data['name'] ?? '',
@@ -72,6 +116,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       debugPrint("Failed to register login event with database: $e");
     }
 
+    // If profile is incomplete, direct to SetupScreen
     if (mounted) {
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (_) => const SetupScreen()),
@@ -89,10 +134,65 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              const SizedBox(height: 20),
+              
+              // Segmented Tab Mode Switcher
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                padding: const EdgeInsets.all(4),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => setState(() => _isSignUp = false),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          decoration: BoxDecoration(
+                            color: !_isSignUp ? AppColors.primary : Colors.transparent,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          alignment: Alignment.center,
+                          child: Text(
+                            "Sign In",
+                            style: TextStyle(
+                              color: !_isSignUp ? Colors.white : AppColors.textMuted,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => setState(() => _isSignUp = true),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          decoration: BoxDecoration(
+                            color: _isSignUp ? AppColors.primary : Colors.transparent,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          alignment: Alignment.center,
+                          child: Text(
+                            "Sign Up",
+                            style: TextStyle(
+                              color: _isSignUp ? Colors.white : AppColors.textMuted,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
               const SizedBox(height: 40),
-              const Text(
-                "Welcome to\nSheDefends",
-                style: TextStyle(
+              
+              Text(
+                _isSignUp ? "Create Account\non SheDefends" : "Welcome to\nSheDefends",
+                style: const TextStyle(
                   fontSize: 32,
                   fontWeight: FontWeight.bold,
                   color: AppColors.primary,
@@ -100,11 +200,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ),
               ),
               const SizedBox(height: 8),
-              const Text(
-                "Sign in to access your personal safety, wellness, and AI health assistant.",
-                style: TextStyle(color: AppColors.textMuted, fontSize: 15),
+              Text(
+                _isSignUp
+                    ? "Sign up to access your personal safety, wellness, and AI health assistant."
+                    : "Sign in to access your personal safety, wellness, and AI health assistant.",
+                style: const TextStyle(color: AppColors.textMuted, fontSize: 15),
               ),
-              const SizedBox(height: 48),
+              const SizedBox(height: 36),
               
               // Google Login Button
               SizedBox(
@@ -112,9 +214,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 child: OutlinedButton.icon(
                   onPressed: () => _handleMockLogin(true),
                   icon: const Icon(Icons.g_mobiledata, size: 28, color: AppColors.primary),
-                  label: const Text(
-                    "Continue with Google",
-                    style: TextStyle(color: AppColors.textDark, fontWeight: FontWeight.w600),
+                  label: Text(
+                    _isSignUp ? "Sign Up with Google" : "Continue with Google",
+                    style: const TextStyle(color: AppColors.textDark, fontWeight: FontWeight.w600),
                   ),
                   style: OutlinedButton.styleFrom(
                     side: const BorderSide(color: Color(0xFFE5E7EB)),
@@ -178,24 +280,25 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               ),
               const SizedBox(height: 12),
               
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: () {},
-                  child: const Text(
-                    "Forgot Password?",
-                    style: TextStyle(color: AppColors.primaryActive, fontWeight: FontWeight.w600),
+              if (!_isSignUp)
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: () {},
+                    child: const Text(
+                      "Forgot Password?",
+                      style: TextStyle(color: AppColors.primaryActive, fontWeight: FontWeight.w600),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 24),
 
-              // Primary Login button
+              // Primary Auth button
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
                   onPressed: () => _handleMockLogin(false),
-                  child: const Text("Sign In"),
+                  child: Text(_isSignUp ? "Sign Up" : "Sign In"),
                 ),
               ),
             ],
