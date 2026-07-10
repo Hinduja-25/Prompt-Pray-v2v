@@ -4,284 +4,360 @@ import 'package:she_defends_app/core/theme/app_theme.dart';
 import 'package:she_defends_app/features/health/symptom_checker_screen.dart';
 import 'package:she_defends_app/features/health/health_history_screen.dart';
 import 'package:she_defends_app/features/health/medication_manager_screen.dart';
+// ScheduleRefillsScreen and AddMedicationSheet are exported from medication_manager_screen.dart
 
-class HealthScreen extends ConsumerWidget {
+class HealthScreen extends ConsumerStatefulWidget {
   const HealthScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<HealthScreen> createState() => _HealthScreenState();
+}
+
+class _HealthScreenState extends ConsumerState<HealthScreen> {
+  final List<Map<String, dynamic>> _medications = [
+    {
+      "name": "Vitamin D3",
+      "dosage": "1000 IU",
+      "time": "08:00 AM",
+      "taken": true,
+      "type": "pill"
+    },
+    {
+      "name": "Iron Supplement",
+      "dosage": "65 mg",
+      "time": "08:30 AM",
+      "taken": false,
+      "type": "bottle"
+    }
+  ];
+
+  void _addMedication(Map<String, dynamic> med) {
+    setState(() {
+      _medications.add({
+        "name": med["name"],
+        "dosage": med["dosage"],
+        "time": med["times"].isNotEmpty ? med["times"].first : "08:00 AM",
+        "taken": false,
+        "type": "pill",
+      });
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: const Color(0xFFF9FAFB),
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.menu, color: AppColors.primary),
+          onPressed: () {},
+        ),
         title: const Text(
-          'Health',
+          'SheDefends',
           style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 20),
         ),
+        actions: [
+          // Extra shortcut actions for other Health sub-modules
+          IconButton(
+            icon: const Icon(Icons.healing_outlined, color: AppColors.primary),
+            tooltip: "Symptom Checker",
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const SymptomCheckerScreen()),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.history_rounded, color: AppColors.primary),
+            tooltip: "Health History",
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const HealthHistoryScreen()),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.notifications_none_rounded, color: AppColors.primary),
+            onPressed: () {},
+          ),
+        ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(20.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Top greeting
-            _HealthGreeting(),
+            // Header row with "August" picker
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: const [
+                    Text(
+                      "Medications",
+                      style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppColors.primary),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      "Stay on track with your health\nsanctuary.",
+                      style: TextStyle(fontSize: 13, color: AppColors.textMuted, height: 1.3),
+                    ),
+                  ],
+                ),
+                GestureDetector(
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const ScheduleRefillsScreen()),
+                  ),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF3F0FF),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: AppColors.lavender),
+                    ),
+                    child: Row(
+                      children: const [
+                        Icon(Icons.calendar_today, size: 14, color: AppColors.primary),
+                        SizedBox(width: 6),
+                        Text(
+                          "August",
+                          style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+
+            // Horizontal calendar
+            _buildHorizontalCalendar(),
+            const SizedBox(height: 20),
+
+            // Next Dose banner
+            _buildNextDoseBanner(),
             const SizedBox(height: 24),
 
-            // 3 main modules
-            const Text(
-              'Health Modules',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.textDark),
-            ),
-            const SizedBox(height: 14),
-            _ModuleCard(
-              icon: Icons.medical_services_rounded,
-              title: 'AI Symptom Checker',
-              subtitle: 'Describe symptoms · Voice input · AI diagnosis',
-              gradient: const [Color(0xFF4C1D95), Color(0xFF7C3AED)],
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const SymptomCheckerScreen()),
-              ),
+            // Morning section
+            Row(
+              children: const [
+                Icon(Icons.wb_sunny_outlined, color: Colors.orange, size: 18),
+                SizedBox(width: 6),
+                Text(
+                  "Morning",
+                  style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.textMuted, fontSize: 13),
+                ),
+              ],
             ),
             const SizedBox(height: 12),
-            _ModuleCard(
-              icon: Icons.history_rounded,
-              title: 'Health History',
-              subtitle: 'Timeline · Past reports · Detailed view',
-              gradient: const [Color(0xFF0F766E), Color(0xFF14B8A6)],
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const HealthHistoryScreen()),
-              ),
-            ),
-            const SizedBox(height: 12),
-            _ModuleCard(
-              icon: Icons.medication_rounded,
-              title: 'Medication Manager',
-              subtitle: 'Daily schedule · Reminders · Refill tracking',
-              gradient: const [Color(0xFFB45309), Color(0xFFF59E0B)],
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const MedicationManagerScreen()),
-              ),
-            ),
-            const SizedBox(height: 24),
 
-            // Quick vitals
-            const Text(
-              'Quick Vitals',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.textDark),
+            // Medications List
+            ..._medications.map((med) => _buildMedCard(med)),
+
+            const SizedBox(height: 24),
+            // Button to open Add Medication Screen
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => showModalBottomSheet(
+                  context: context,
+                  isScrollControlled: true,
+                  backgroundColor: Colors.transparent,
+                  builder: (context) => DraggableScrollableSheet(
+                    initialChildSize: 0.9,
+                    maxChildSize: 0.95,
+                    minChildSize: 0.7,
+                    builder: (_, scrollController) => AddMedicationSheet(
+                      onAdd: _addMedication,
+                    ),
+                  ),
+                ),
+                icon: const Icon(Icons.add, color: AppColors.primary),
+                label: const Text(
+                  "Add New Medication",
+                  style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold),
+                ),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: AppColors.lavender, width: 2),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                ),
+              ),
             ),
-            const SizedBox(height: 12),
-            _VitalsRow(),
           ],
         ),
       ),
     );
   }
-}
 
-class _HealthGreeting extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildHorizontalCalendar() {
+    final List<Map<String, dynamic>> days = [
+      {"day": "M", "date": 14},
+      {"day": "T", "date": 15},
+      {"day": "W", "date": 16, "selected": true},
+      {"day": "T", "date": 17},
+      {"day": "F", "date": 18},
+      {"day": "S", "date": 19},
+      {"day": "S", "date": 20},
+    ];
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: days.map((d) {
+        final isSel = d["selected"] ?? false;
+        return Container(
+          width: 44,
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          decoration: BoxDecoration(
+            color: isSel ? Colors.transparent : Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: isSel ? AppColors.primary : const Color(0xFFE5E7EB),
+              width: isSel ? 2 : 1,
+            ),
+          ),
+          child: Column(
+            children: [
+              Text(
+                d["day"],
+                style: TextStyle(
+                  color: isSel ? AppColors.primary : AppColors.textMuted,
+                  fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
+                  fontSize: 12,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                "${d["date"]}",
+                style: TextStyle(
+                  color: AppColors.textDark,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
+              ),
+            ],
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildNextDoseBanner() {
     return Container(
-      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFFF3F0FF), Color(0xFFEDE9FE)],
+          colors: [Color(0xFF2D0C57), Color(0xFF4C1D95)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.lavender),
+      ),
+      padding: const EdgeInsets.all(20),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: const [
+              Text(
+                "NEXT DOSE IN",
+                style: TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1),
+              ),
+              SizedBox(height: 6),
+              Text(
+                "02:45 hours",
+                style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+              ),
+              SizedBox(height: 4),
+              Text(
+                "Next: Multivitamin at 1:00 PM",
+                style: TextStyle(color: Colors.white70, fontSize: 12),
+              ),
+            ],
+          ),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.1),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.timer_outlined, color: Colors.white, size: 24),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMedCard(Map<String, dynamic> med) {
+    final isTaken = med["taken"] ?? false;
+    final isPill = med["type"] == "pill";
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
       ),
       child: Row(
         children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF3F0FF),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Icon(
+              isPill ? Icons.adjust : Icons.opacity,
+              color: AppColors.primary,
+              size: 22,
+            ),
+          ),
+          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
+              children: [
                 Text(
-                  'Your Health Dashboard',
-                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppColors.primary),
+                  med["name"],
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.textDark),
                 ),
-                SizedBox(height: 6),
+                const SizedBox(height: 4),
                 Text(
-                  'Monitor your well-being, track medications, and get AI-powered health insights.',
-                  style: TextStyle(color: AppColors.textMuted, fontSize: 13, height: 1.5),
+                  "${med["dosage"]} • ${med["time"]}",
+                  style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
                 ),
               ],
             ),
           ),
           const SizedBox(width: 12),
-          const Icon(Icons.favorite_rounded, color: AppColors.primary, size: 40),
-        ],
-      ),
-    );
-  }
-}
-
-class _ModuleCard extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final List<Color> gradient;
-  final VoidCallback onTap;
-
-  const _ModuleCard({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.gradient,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(colors: gradient, begin: Alignment.topLeft, end: Alignment.bottomRight),
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: gradient.first.withOpacity(0.3),
-              blurRadius: 16,
-              offset: const Offset(0, 6),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
+          GestureDetector(
+            onTap: () {
+              setState(() {
+                med["taken"] = !isTaken;
+              });
+            },
+            child: Container(
+              width: 36,
+              height: 36,
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(14),
+                color: isTaken ? AppColors.primary : Colors.transparent,
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: isTaken ? AppColors.primary : const Color(0xFFE5E7EB),
+                  width: 2,
+                ),
               ),
-              child: Icon(icon, color: Colors.white, size: 28),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    subtitle,
-                    style: const TextStyle(color: Colors.white70, fontSize: 12),
-                  ),
-                ],
+              child: Icon(
+                isTaken ? Icons.check : Icons.add,
+                color: isTaken ? Colors.white : AppColors.primary,
+                size: 18,
               ),
             ),
-            const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white70, size: 16),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _VitalsRow extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: const [
-        Expanded(
-          child: _VitalCard(
-            icon: Icons.favorite_rounded,
-            label: 'Heart Rate',
-            value: '72',
-            unit: 'bpm',
-            color: Color(0xFFEF4444),
-            bgColor: Color(0xFFFFF5F5),
-          ),
-        ),
-        SizedBox(width: 12),
-        Expanded(
-          child: _VitalCard(
-            icon: Icons.nightlight_round,
-            label: 'Sleep',
-            value: '7.5',
-            unit: 'hrs',
-            color: Color(0xFF4C1D95),
-            bgColor: Color(0xFFF5F3FF),
-          ),
-        ),
-        SizedBox(width: 12),
-        Expanded(
-          child: _VitalCard(
-            icon: Icons.water_drop_rounded,
-            label: 'Hydration',
-            value: '1.8',
-            unit: 'L',
-            color: Color(0xFF0EA5E9),
-            bgColor: Color(0xFFF0F9FF),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _VitalCard extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String value;
-  final String unit;
-  final Color color;
-  final Color bgColor;
-
-  const _VitalCard({
-    required this.icon,
-    required this.label,
-    required this.value,
-    required this.unit,
-    required this.color,
-    required this.bgColor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withOpacity(0.2)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: color, size: 20),
-          const SizedBox(height: 8),
-          Text(
-            label,
-            style: TextStyle(color: color.withOpacity(0.7), fontSize: 11),
-          ),
-          const SizedBox(height: 2),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(value, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: color)),
-              const SizedBox(width: 2),
-              Padding(
-                padding: const EdgeInsets.only(bottom: 2),
-                child: Text(unit, style: TextStyle(fontSize: 10, color: color.withOpacity(0.7))),
-              ),
-            ],
           ),
         ],
       ),

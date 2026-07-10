@@ -78,6 +78,7 @@ class _WellnessScreenState extends ConsumerState<WellnessScreen> with SingleTick
           _journalController.clear();
         });
         
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Journal entry saved successfully")),
         );

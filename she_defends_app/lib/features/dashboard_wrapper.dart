@@ -416,7 +416,7 @@ class _DashboardWrapperState extends ConsumerState<DashboardWrapper> {
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.08),
+                color: Colors.white.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(color: Colors.white10),
               ),
@@ -496,7 +496,7 @@ class _DashboardWrapperState extends ConsumerState<DashboardWrapper> {
                   ),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(color: AppColors.emergency.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
+                    decoration: BoxDecoration(color: AppColors.emergency.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
                     child: Text(durationStr, style: const TextStyle(color: AppColors.emergency, fontWeight: FontWeight.bold, fontSize: 13)),
                   )
                 ],
@@ -520,7 +520,7 @@ class _DashboardWrapperState extends ConsumerState<DashboardWrapper> {
                         left: 12,
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(color: Colors.black.withOpacity(0.6), borderRadius: BorderRadius.circular(8)),
+                          decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.6), borderRadius: BorderRadius.circular(8)),
                           child: Text("Speed: ${state.speed} mph", style: const TextStyle(color: Colors.white, fontSize: 11)),
                         ),
                       ),
@@ -529,7 +529,7 @@ class _DashboardWrapperState extends ConsumerState<DashboardWrapper> {
                         right: 12,
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(color: Colors.black.withOpacity(0.6), borderRadius: BorderRadius.circular(8)),
+                          decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.6), borderRadius: BorderRadius.circular(8)),
                           child: Text("Battery: ${state.batteryPercentage}%", style: const TextStyle(color: Colors.white, fontSize: 11)),
                         ),
                       )
@@ -613,7 +613,7 @@ class _DashboardWrapperState extends ConsumerState<DashboardWrapper> {
                             return Container(
                               width: 3,
                               height: h,
-                              decoration: BoxDecoration(color: AppColors.emergency.withOpacity(0.7), borderRadius: BorderRadius.circular(2)),
+                              decoration: BoxDecoration(color: AppColors.emergency.withValues(alpha: 0.7), borderRadius: BorderRadius.circular(2)),
                             );
                           }),
                         ),
@@ -693,7 +693,7 @@ class _DashboardWrapperState extends ConsumerState<DashboardWrapper> {
   // --- SOS Countdown Overlay ---
   Widget _buildSosCountdownOverlay(int seconds) {
     return Container(
-      color: AppColors.primary.withOpacity(0.95),
+      color: AppColors.primary.withValues(alpha: 0.95),
       width: double.infinity,
       height: double.infinity,
       child: Column(
@@ -709,7 +709,7 @@ class _DashboardWrapperState extends ConsumerState<DashboardWrapper> {
             height: 160,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              border: Border.all(color: Colors.white.withOpacity(0.2), width: 10),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.2), width: 10),
             ),
             alignment: Alignment.center,
             child: Text(
