@@ -24,18 +24,7 @@ class GeminiService:
             self.model = genai.GenerativeModel(self.model_name)
 
     def _generate_json_with_fallback(self, prompt, mock_fallback_data):
-        # 1. Try Gemini
-        if gemini_initialized:
-            try:
-                response = self.model.generate_content(prompt)
-                content = response.text.strip()
-                if content.startswith("```json"):
-                    content = content.replace("```json", "").replace("```", "").strip()
-                return json.loads(content)
-            except Exception as e:
-                logging.warning(f"Gemini generation failed: {e}. Trying other providers...")
-
-        # 2. Try OpenAI
+        # 1. Try OpenAI
         if hasattr(Config, "OPENAI_API_KEY") and Config.OPENAI_API_KEY:
             try:
                 url = "https://api.openai.com/v1/chat/completions"
@@ -56,6 +45,18 @@ class GeminiService:
                     logging.warning(f"OpenAI API failed: {res.text}")
             except Exception as e:
                 logging.warning(f"OpenAI generation failed: {e}. Trying other providers...")
+
+        # 2. Try Gemini
+        if gemini_initialized:
+            try:
+                response = self.model.generate_content(prompt)
+                content = response.text.strip()
+                if content.startswith("```json"):
+                    content = content.replace("```json", "").replace("```", "").strip()
+                return json.loads(content)
+            except Exception as e:
+                logging.warning(f"Gemini generation failed: {e}. Trying other providers...")
+
 
         # 3. Try Groq (Llama)
         if hasattr(Config, "GROQ_API_KEY") and Config.GROQ_API_KEY:

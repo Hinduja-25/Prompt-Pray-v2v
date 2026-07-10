@@ -1,7 +1,10 @@
 from flask import Blueprint, request, jsonify
 from datetime import datetime
+import math
+import requests
 from middleware.auth import login_required
 from services.db_service import db_service
+
 
 safety_bp = Blueprint("safety", __name__)
 
@@ -166,14 +169,126 @@ def upload_recording():
     recording_data.pop("_id", None)  # Remove MongoDB ObjectId to prevent JSON serialization error
     return jsonify({"message": "Recording uploaded successfully", "recording": recording_data}), 200
 
+def calculate_distance(lat1, lon1, lat2, lon2):
+    p = 0.017453292519943295  # Math.PI / 180
+    a = 0.5 - math.cos((lat2 - lat1) * p)/2 + math.cos(lat1 * p) * math.cos(lat2 * p) * (1 - math.cos((lon2 - lon1) * p))/2
+    return 12742 * math.asin(math.sqrt(a))  # km
+
 @safety_bp.route("/safe-places", methods=["GET"])
 @login_required
 def get_safe_places():
-    places = [
-        {"name": "St. Mary Medical Center", "dist": "0.8 miles away", "phone": "555-0199", "type": "Hospital", "address": "123 Health Ave", "status": "Open 24/7"},
-        {"name": "Central Police Precinct", "dist": "1.2 miles away", "phone": "555-0144", "type": "Police Station", "address": "456 Safety St", "status": "Open 24/7"},
-        {"name": "SafeHaven Community Center", "dist": "1.5 miles away", "phone": "555-0122", "type": "Safe Place", "address": "789 Care Rd", "status": "Open 08:00 AM - 10:00 PM"},
-        {"name": "24/7 Downtown Pharmacy", "dist": "1.8 miles away", "phone": "555-0188", "type": "Pharmacy", "address": "101 Pill Blvd", "status": "Open 24/7"},
-        {"name": "Women's Crisis Helpline Office", "dist": "2.1 miles away", "phone": "555-0211", "type": "Safe Place", "address": "202 Support Dr", "status": "Open 24/7"},
+    lat_val = request.args.get("lat")
+    lng_val = request.args.get("lng")
+    
+    fallback_places = [
+        {"name": "St. Mary Medical Center", "lat": 40.7799, "lng": -73.9672, "phone": "555-0199", "type": "Hospital", "dist": "0.80 miles away"},
+        {"name": "Central Police Precinct", "lat": 40.7679, "lng": -73.9762, "phone": "555-0144", "type": "Police Station", "dist": "1.20 miles away"},
+        {"name": "SafeHaven Community Center", "lat": 40.7829, "lng": -73.9772, "phone": "555-0122", "type": "Safe Place", "dist": "1.50 miles away"},
+        {"name": "24/7 Downtown Pharmacy", "lat": 40.7719, "lng": -73.9632, "phone": "555-0188", "type": "Pharmacy", "dist": "1.80 miles away"},
+        {"name": "Women's Crisis Helpline Office", "lat": 40.7709, "lng": -73.9792, "phone": "555-0211", "type": "Safe Place", "dist": "2.10 miles away"},
     ]
-    return jsonify(places), 200
+    
+    if not lat_val or not lng_val:
+        return jsonify(fallback_places), 200
+        
+    try:
+        lat = float(lat_val)
+        lng = float(lng_val)
+    except ValueError:
+        return jsonify(fallback_places), 200
+
+    # Query Overpass API for police, hospital, pharmacy, and community centre within 5000 meters (5km)
+    query = f"""[out:json][timeout:15];
+    (
+      node["amenity"="police"](around:5000, {lat}, {lng});
+      way["amenity"="police"](around:5000, {lat}, {lng});
+      node["amenity"="hospital"](around:5000, {lat}, {lng});
+      way["amenity"="hospital"](around:5000, {lat}, {lng});
+      node["amenity"="pharmacy"](around:5000, {lat}, {lng});
+      way["amenity"="pharmacy"](around:5000, {lat}, {lng});
+      node["amenity"="community_centre"](around:5000, {lat}, {lng});
+      way["amenity"="community_centre"](around:5000, {lat}, {lng});
+    );
+    out tags center;"""
+    
+    url = "https://overpass-api.de/api/interpreter"
+    headers = {
+        "User-Agent": "SheDefendsApp/1.0 (contact: hindujasimhadri@gmail.com)"
+    }
+    
+    try:
+        response = requests.post(url, data={"data": query}, headers=headers, timeout=15)
+        if response.status_code == 200:
+            osm_data = response.json()
+            elements = osm_data.get("elements", [])
+            places = []
+            
+            for elem in elements:
+                tags = elem.get("tags", {})
+                amenity = tags.get("amenity")
+                
+                if amenity == "police":
+                    p_type = "Police Station"
+                    fallback_phone = "100"
+                elif amenity == "hospital":
+                    p_type = "Hospital"
+                    fallback_phone = "108"
+                elif amenity == "pharmacy":
+                    p_type = "Pharmacy"
+                    fallback_phone = "102"
+                else:
+                    p_type = "Safe Place"
+                    fallback_phone = "555-0122"
+                
+                name = tags.get("name")
+                if not name:
+                    brand = tags.get("brand") or tags.get("operator")
+                    street = tags.get("addr:street")
+                    if brand:
+                        name = f"{brand} ({p_type})"
+                    elif street:
+                        name = f"{p_type} on {street}"
+                    else:
+                        name = f"Nearby {p_type}"
+                
+                elem_lat = elem.get("lat") or elem.get("center", {}).get("lat")
+                elem_lng = elem.get("lon") or elem.get("center", {}).get("lon")
+                
+                if elem_lat is None or elem_lng is None:
+                    continue
+                
+                phone = tags.get("phone") or tags.get("contact:phone") or fallback_phone
+                dist_km = calculate_distance(lat, lng, elem_lat, elem_lng)
+                
+                places.append({
+                    "name": name,
+                    "lat": elem_lat,
+                    "lng": elem_lng,
+                    "phone": phone,
+                    "type": p_type,
+                    "distance_km": dist_km
+                })
+            
+            places.sort(key=lambda x: x["distance_km"])
+            
+            if not places:
+                return jsonify(fallback_places), 200
+                
+            formatted_places = []
+            for p in places[:8]:
+                dist_miles = p["distance_km"] * 0.621371
+                formatted_places.append({
+                    "name": p["name"],
+                    "lat": p["lat"],
+                    "lng": p["lng"],
+                    "phone": p["phone"],
+                    "type": p["type"],
+                    "dist": f"{dist_miles:.2f} miles away"
+                })
+            return jsonify(formatted_places), 200
+    except Exception as e:
+        import logging
+        logging.error(f"Failed to fetch real safe places from Overpass API: {e}")
+        
+    return jsonify(fallback_places), 200
+

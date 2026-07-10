@@ -61,7 +61,7 @@ class _SafetyScreenState extends ConsumerState<SafetyScreen> {
         setState(() {
           _startController.text = "GPS: ${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)}";
         });
-        _generateNearbyPlaces(position.latitude, position.longitude);
+        await _generateNearbyPlaces(position.latitude, position.longitude);
       }
     } catch (e) {
       debugPrint("Error fetching real location: $e");
@@ -79,8 +79,22 @@ class _SafetyScreenState extends ConsumerState<SafetyScreen> {
     });
   }
 
-  void _generateNearbyPlaces(double lat, double lng) {
-    final List<Map<String, dynamic>> places = [
+  Future<void> _generateNearbyPlaces(double lat, double lng) async {
+    try {
+      final response = await _apiClient.get("/safety/safe-places?lat=$lat&lng=$lng");
+      if (response.statusCode == 200 && response.data is List) {
+        final List<Map<String, dynamic>> places = List<Map<String, dynamic>>.from(
+          (response.data as List).map((p) => Map<String, dynamic>.from(p))
+        );
+        _updatePlacesList(places, lat, lng);
+        return;
+      }
+    } catch (e) {
+      debugPrint("Failed to fetch nearby safe places from backend: $e");
+    }
+
+    // Local fallback if API fails
+    final List<Map<String, dynamic>> fallbackPlaces = [
       {
         "name": "St. Mary Medical Center",
         "lat": lat + 0.005,
@@ -111,7 +125,7 @@ class _SafetyScreenState extends ConsumerState<SafetyScreen> {
       },
     ];
 
-    _updatePlacesList(places, lat, lng);
+    _updatePlacesList(fallbackPlaces, lat, lng);
   }
 
   void _generateFallbackPlaces() {
@@ -120,16 +134,19 @@ class _SafetyScreenState extends ConsumerState<SafetyScreen> {
     _generateNearbyPlaces(lat, lng);
   }
 
+
   void _updatePlacesList(List<Map<String, dynamic>> basePlaces, double userLat, double userLng) {
     final List<Map<String, dynamic>> updated = [];
     for (var place in basePlaces) {
-      final double distKm = _calculateDistance(userLat, userLng, place["lat"] as double, place["lng"] as double);
+      final double lat = (place["lat"] as num).toDouble();
+      final double lng = (place["lng"] as num).toDouble();
+      final double distKm = _calculateDistance(userLat, userLng, lat, lng);
       final double distMiles = distKm * 0.621371;
       
       updated.add({
         "name": place["name"],
-        "lat": place["lat"],
-        "lng": place["lng"],
+        "lat": lat,
+        "lng": lng,
         "phone": place["phone"],
         "type": place["type"],
         "dist": "${distMiles.toStringAsFixed(2)} miles",
@@ -141,6 +158,7 @@ class _SafetyScreenState extends ConsumerState<SafetyScreen> {
       });
     }
   }
+
 
   double _calculateDistance(double lat1, double lon1, double lat2, double lon2) {
     var p = 0.017453292519943295; // Math.PI / 180
