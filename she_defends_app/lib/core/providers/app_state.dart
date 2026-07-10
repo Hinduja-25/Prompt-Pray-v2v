@@ -221,7 +221,8 @@ class SosState {
 }
 
 class SosNotifier extends StateNotifier<SosState> {
-  SosNotifier() : super(SosState(status: SosStatus.idle, countdownSeconds: 5));
+  final Ref ref;
+  SosNotifier(this.ref) : super(SosState(status: SosStatus.idle, countdownSeconds: 5));
 
   void toggleTriggerMode(bool oneTap) {
     state = state.copyWith(isOneTapTrigger: oneTap);
@@ -240,11 +241,14 @@ class SosNotifier extends StateNotifier<SosState> {
   }
 
   void triggerSos() {
-    final list = [
-      ContactNotified(name: "Mom", status: "Delivered (SMS)"),
-      ContactNotified(name: "Dad", status: "Delivered (App)"),
-      ContactNotified(name: "Sarah (Bestie)", status: "Delivered (SMS)"),
-    ];
+    final contacts = ref.read(emergencyContactsProvider);
+    final List<ContactNotified> list = contacts.isNotEmpty
+        ? contacts.map((c) => ContactNotified(name: "${c.name} (${c.phone})", status: "Delivered (SMS)")).toList()
+        : [
+            ContactNotified(name: "Mom", status: "Delivered (SMS)"),
+            ContactNotified(name: "Dad", status: "Delivered (App)"),
+            ContactNotified(name: "Sarah (Bestie)", status: "Delivered (SMS)"),
+          ];
     state = state.copyWith(
       status: SosStatus.active,
       countdownSeconds: 0,
@@ -271,7 +275,7 @@ class SosNotifier extends StateNotifier<SosState> {
   }
 }
 
-final sosProvider = StateNotifierProvider<SosNotifier, SosState>((ref) => SosNotifier());
+final sosProvider = StateNotifierProvider<SosNotifier, SosState>((ref) => SosNotifier(ref));
 
 // --- Guardian Mode State ---
 enum GuardianStatus { inactive, active, deviationWarning, completed }

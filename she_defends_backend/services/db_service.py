@@ -306,9 +306,15 @@ class DBService:
     def get_journal_entries(self, uid):
         return list(self.db.journals.find({"uid": uid}, {"_id": 0}).sort("timestamp", -1))
 
-    # --- Emergency Contacts Methods ---
     def get_emergency_contacts(self, uid):
-        return list(self.db.contacts.find({"uid": uid}, {"_id": 0}))
+        contacts = list(self.db.contacts.find({"uid": uid}))
+        import uuid
+        for c in contacts:
+            if "id" not in c or not c["id"]:
+                c["id"] = uuid.uuid4().hex
+                self.db.contacts.update_one({"_id": c["_id"]}, {"$set": {"id": c["id"]}})
+            c.pop("_id", None)
+        return contacts
 
     def save_emergency_contact(self, uid, contact_data):
         import uuid

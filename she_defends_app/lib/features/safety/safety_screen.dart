@@ -214,7 +214,7 @@ class _SafetyScreenState extends ConsumerState<SafetyScreen> {
       "phone": phone,
       "category": _selectedContactCategory,
     };
-    if (editId != null) {
+    if (editId != null && editId.isNotEmpty) {
       data["id"] = editId;
     }
 
@@ -222,7 +222,7 @@ class _SafetyScreenState extends ConsumerState<SafetyScreen> {
       final res = await _apiClient.post("/safety/contacts", data: data);
       final savedId = res.data["id"] ?? editId ?? DateTime.now().millisecondsSinceEpoch.toString();
       
-      if (editId != null) {
+      if (editId != null && editId.isNotEmpty) {
         ref.read(emergencyContactsProvider.notifier).editContact(editId, name, phone, _selectedContactCategory);
       } else {
         ref.read(emergencyContactsProvider.notifier).addContact(savedId, name, phone, _selectedContactCategory);
@@ -259,43 +259,50 @@ class _SafetyScreenState extends ConsumerState<SafetyScreen> {
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text(contact != null ? "Edit Contact" : "Add Emergency Contact", style: const TextStyle(fontWeight: FontWeight.bold)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: _contactNameController,
-              decoration: const InputDecoration(labelText: "Full Name", hintText: "Enter contact name"),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text(contact != null ? "Edit Contact" : "Add Emergency Contact", style: const TextStyle(fontWeight: FontWeight.bold)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: _contactNameController,
+                decoration: const InputDecoration(labelText: "Full Name", hintText: "Enter contact name"),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _contactPhoneController,
+                decoration: const InputDecoration(labelText: "Phone Number", hintText: "Enter phone number"),
+                keyboardType: TextInputType.phone,
+              ),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                // ignore: deprecated_member_use
+                value: _selectedContactCategory,
+                decoration: const InputDecoration(labelText: "Relationship Category"),
+                items: ["Family", "Friends", "Guardians", "Emergency Services"].map((cat) {
+                  return DropdownMenuItem(value: cat, child: Text(cat));
+                }).toList(),
+                onChanged: (val) {
+                  if (val != null) {
+                    setDialogState(() {
+                      _selectedContactCategory = val;
+                    });
+                  }
+                },
+              )
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
+            ElevatedButton(
+              onPressed: () => _addOrEditContact(
+                editId: (contact?.id != null && contact!.id.isNotEmpty) ? contact.id : null,
+              ),
+              child: const Text("Save"),
             ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _contactPhoneController,
-              decoration: const InputDecoration(labelText: "Phone Number", hintText: "Enter phone number"),
-              keyboardType: TextInputType.phone,
-            ),
-            const SizedBox(height: 16),
-            DropdownButtonFormField<String>(
-              initialValue: _selectedContactCategory,
-              decoration: const InputDecoration(labelText: "Relationship Category"),
-              items: ["Family", "Friends", "Guardians", "Emergency Services"].map((cat) {
-                return DropdownMenuItem(value: cat, child: Text(cat));
-              }).toList(),
-              onChanged: (val) {
-                if (val != null) {
-                  setState(() => _selectedContactCategory = val);
-                }
-              },
-            )
           ],
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
-          ElevatedButton(
-            onPressed: () => _addOrEditContact(editId: contact?.id),
-            child: const Text("Save"),
-          ),
-        ],
       ),
     );
   }
