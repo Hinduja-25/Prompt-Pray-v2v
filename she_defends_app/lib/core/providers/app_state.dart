@@ -44,6 +44,11 @@ class UserProfile {
   final String medicalConditions;
   final List<String> emergencyContacts;
   final String preferredLanguage;
+  final String height; // in cm
+  final String weight; // in kg
+  final String activityLevel;
+  final String dietaryPreference;
+  final String fitnessGoal;
 
   UserProfile({
     this.name = '',
@@ -53,7 +58,24 @@ class UserProfile {
     this.medicalConditions = '',
     this.emergencyContacts = const [],
     this.preferredLanguage = 'English',
+    this.height = '165',
+    this.weight = '60',
+    this.activityLevel = 'Lightly Active',
+    this.dietaryPreference = 'Vegetarian',
+    this.fitnessGoal = 'Healthy Maintenance',
   });
+
+  // Calculate BMI: Weight / (Height / 100)^2
+  double get bmi {
+    try {
+      final h = double.parse(height) / 100;
+      final w = double.parse(weight);
+      if (h <= 0) return 0.0;
+      return double.parse((w / (h * h)).toStringAsFixed(1));
+    } catch (e) {
+      return 22.0;
+    }
+  }
 
   UserProfile copyWith({
     String? name,
@@ -63,6 +85,11 @@ class UserProfile {
     String? medicalConditions,
     List<String>? emergencyContacts,
     String? preferredLanguage,
+    String? height,
+    String? weight,
+    String? activityLevel,
+    String? dietaryPreference,
+    String? fitnessGoal,
   }) {
     return UserProfile(
       name: name ?? this.name,
@@ -72,6 +99,11 @@ class UserProfile {
       medicalConditions: medicalConditions ?? this.medicalConditions,
       emergencyContacts: emergencyContacts ?? this.emergencyContacts,
       preferredLanguage: preferredLanguage ?? this.preferredLanguage,
+      height: height ?? this.height,
+      weight: weight ?? this.weight,
+      activityLevel: activityLevel ?? this.activityLevel,
+      dietaryPreference: dietaryPreference ?? this.dietaryPreference,
+      fitnessGoal: fitnessGoal ?? this.fitnessGoal,
     );
   }
 }
@@ -556,3 +588,4 @@ class StealthNotifier extends StateNotifier<StealthState> {
 }
 
 final stealthProvider = StateNotifierProvider<StealthNotifier, StealthState>((ref) => StealthNotifier());
+// --- Water Intake State ---
