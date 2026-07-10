@@ -1,35 +1,35 @@
-# SheDefends 🚨❤️
+# SheDefends
 
 A premium, modern personal safety, health, and wellness application for women. SheDefends empowers users through live location monitoring, quick emergency SOS broadcasts, simulated decoy tools, AI health analysis, mood insights, and an empathetic chatbot companion.
 
 ---
 
-## 🌟 Key Features
+##  Key Features
 
-### 1. Safety Shield 🛡️
+### 1. Safety Shield 
 * **Guardian Mode**: Track journeys in real-time. Share live GPS coordinates and estimated arrival times with chosen emergency contacts.
 * **Overpass API Integration**: Query live OpenStreetMap points of interest (hospitals, police stations, pharmacies, community centers) within 5 km of the user's GPS coordinates, sorted by proximity.
 * **Stealth & Decoy Calculator Lock**: A fully functional calculator decoy screen. Entering the correct PIN unlocks the real application, while a **Silent SOS** can be triggered directly in case of emergency.
 * **Fake Call Simulator**: Schedule decoy voice calls to exit uncomfortable or unsafe situations.
 * **Siren Sound Emergency Alert**: Loops a loud emergency police siren, which stops immediately when clicking **"I am Safe – Terminate SOS"**.
 
-### 2. AI Chatbot Companion 💬
+### 2. AI Chatbot Companion 
 * **Empathetic Companion**: Conversational assistant built with advanced LLM routing.
 * **Self-Healing Key Support**: Automatically routes keys based on prefixes (OpenAI `sk-` or Groq `gsk_`) to prevent API authentication blocks.
 * **Deep Routing**: Directs users straight to specific parts of the app (e.g. suggesting the Symptom Checker when describing a headache).
 
-### 3. Wellness Center 🧘‍♀️
+### 3. Wellness Center 
 * **Mood Tracker**: Log daily feelings and visualize historical emotional wellness logs.
 * **Interactive Journaling**: Reflect on daily thoughts with backend AI sentiment and theme analysis.
 * **Guided Breathing**: Simple, interactive animation to relax, focus, and ground yourself.
 
-### 4. Health Dashboard 🏥
+### 4. Health Dashboard 
 * **Symptom Checker**: Describe symptoms to receive an empathetic condition assessment, severity ratings, self-care suggestions, dietary recommendations, and warning signs.
 * **Medication Logger**: Sync and monitor medications to maintain daily wellness routines.
 
 ---
 
-## 🛠️ Project Structure
+##  Project Structure
 
 The project is structured as a monorepo containing two main folders:
 1. `she_defends_app/`: The Flutter client frontend application.
@@ -37,7 +37,7 @@ The project is structured as a monorepo containing two main folders:
 
 ---
 
-## 🚀 Getting Started
+##  Getting Started
 
 ### 1. Backend Service Configuration (`she_defends_backend`)
 
@@ -92,7 +92,7 @@ The project is structured as a monorepo containing two main folders:
 
 ---
 
-## 🧪 Verification & Tests
+##  Verification & Tests
 
 ### Backend API Tests
 * Test endpoints locally:
@@ -110,6 +110,6 @@ The project is structured as a monorepo containing two main folders:
 
 ---
 
-## 📝 Authors & License
+## Authors & License
 
 Developed with love for **SheDefends App** — personal health, safety, and wellness companion.
