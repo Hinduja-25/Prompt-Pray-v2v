@@ -193,22 +193,30 @@ def get_safe_places():
     lat_val = request.args.get("lat")
     lng_val = request.args.get("lng")
     
-    fallback_places = [
-        {"name": "St. Mary Medical Center", "lat": 40.7799, "lng": -73.9672, "phone": "555-0199", "type": "Hospital", "dist": "0.80 miles away"},
-        {"name": "Central Police Precinct", "lat": 40.7679, "lng": -73.9762, "phone": "555-0144", "type": "Police Station", "dist": "1.20 miles away"},
-        {"name": "SafeHaven Community Center", "lat": 40.7829, "lng": -73.9772, "phone": "555-0122", "type": "Safe Place", "dist": "1.50 miles away"},
-        {"name": "24/7 Downtown Pharmacy", "lat": 40.7719, "lng": -73.9632, "phone": "555-0188", "type": "Pharmacy", "dist": "1.80 miles away"},
-        {"name": "Women's Crisis Helpline Office", "lat": 40.7709, "lng": -73.9792, "phone": "555-0211", "type": "Safe Place", "dist": "2.10 miles away"},
-    ]
+    default_lat = 40.7749
+    default_lng = -73.9712
     
-    if not lat_val or not lng_val:
-        return jsonify(fallback_places), 200
-        
     try:
-        lat = float(lat_val)
-        lng = float(lng_val)
+        lat = float(lat_val) if lat_val else default_lat
+        lng = float(lng_val) if lng_val else default_lng
     except ValueError:
-        return jsonify(fallback_places), 200
+        lat = default_lat
+        lng = default_lng
+
+    # Generate dynamic local fallback places centered around the requested coordinate
+    fallback_places = [
+        {"name": "St. Mary Medical Center", "lat": lat + 0.005, "lng": lng + 0.004, "phone": "555-0199", "type": "Hospital"},
+        {"name": "Central Police Precinct", "lat": lat - 0.007, "lng": lng - 0.005, "phone": "555-0144", "type": "Police Station"},
+        {"name": "SafeHaven Community Center", "lat": lat + 0.008, "lng": lng - 0.006, "phone": "555-0122", "type": "Safe Place"},
+        {"name": "24/7 Downtown Pharmacy", "lat": lat - 0.003, "lng": lng + 0.008, "phone": "555-0188", "type": "Pharmacy"},
+        {"name": "Women's Crisis Helpline Office", "lat": lat - 0.005, "lng": lng - 0.008, "phone": "555-0211", "type": "Safe Place"},
+    ]
+
+    for p in fallback_places:
+        dist_km = calculate_distance(lat, lng, p["lat"], p["lng"])
+        dist_miles = dist_km * 0.621371
+        p["dist"] = f"{dist_miles:.2f} miles away"
+
 
     # Query Overpass API for police, hospital, pharmacy, and community centre within 5000 meters (5km)
     query = f"""[out:json][timeout:15];
