@@ -61,7 +61,9 @@ class _WellnessScreenState extends ConsumerState<WellnessScreen> with SingleTick
       if (res.data is List) {
         setState(() {
           _journalEntries.clear();
-          _journalEntries.addAll(List<Map<String, dynamic>>.from(res.data));
+          _journalEntries.addAll(
+            (res.data as List).map((e) => Map<String, dynamic>.from(e as Map)).toList()
+          );
         });
 
         // Build recurring themes from loaded entries

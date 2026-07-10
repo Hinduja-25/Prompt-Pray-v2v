@@ -120,7 +120,20 @@ def trigger_sos():
 def get_contacts():
     uid = request.uid
     contacts = db_service.get_emergency_contacts(uid)
+    if not contacts:
+        profile = db_service.get_user_profile(uid)
+        if profile and profile.get("emergencyContacts"):
+            import uuid
+            for c_phone in profile["emergencyContacts"]:
+                db_service.save_emergency_contact(uid, {
+                    "id": uuid.uuid4().hex,
+                    "name": f"Emergency Contact ({c_phone})",
+                    "phone": c_phone,
+                    "category": "Family"
+                })
+            contacts = db_service.get_emergency_contacts(uid)
     return jsonify(contacts), 200
+
 
 @safety_bp.route("/contacts", methods=["POST"])
 @login_required

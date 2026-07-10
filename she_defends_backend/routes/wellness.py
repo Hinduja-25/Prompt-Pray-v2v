@@ -52,6 +52,7 @@ def save_journal():
     }
     
     db_service.save_journal_entry(uid, journal_entry)
+    journal_entry.pop("_id", None)  # Remove MongoDB ObjectId to prevent JSON serialization error
     return jsonify(journal_entry), 200
 
 @wellness_bp.route("/journals", methods=["GET"])
