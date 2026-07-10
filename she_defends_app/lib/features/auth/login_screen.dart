@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:dio/dio.dart';
 import 'package:she_defends_app/core/theme/app_theme.dart';
 import 'package:she_defends_app/core/network/api_client.dart';
 import 'package:she_defends_app/features/auth/setup_screen.dart';
@@ -60,7 +61,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     if (_isSignUp) {
       final apiClient = ApiClient();
       try {
-        await apiClient.post("/auth/login");
+        await apiClient.post("/auth/login", data: {"is_signup": true});
       } catch (e) {
         debugPrint("Failed to register signup login event: $e");
       }
@@ -75,7 +76,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     // Otherwise, check if user already has a completed profile
     final apiClient = ApiClient();
     try {
-      await apiClient.post("/auth/login");
+      await apiClient.post("/auth/login", data: {"is_signup": false});
       
       // Fetch profile to see if setup is done
       final profileResp = await apiClient.get("/auth/profile");
@@ -112,6 +113,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           return;
         }
       }
+    } on DioException catch (e) {
+      debugPrint("Failed to register login event with database: $e");
+      String errMsg = "Login failed. Please try again.";
+      if (e.response != null && e.response!.data != null) {
+        final respData = e.response!.data;
+        if (respData is Map && respData.containsKey("error")) {
+          errMsg = respData["error"];
+        }
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(errMsg)),
+        );
+      }
+      return;
     } catch (e) {
       debugPrint("Failed to register login event with database: $e");
     }

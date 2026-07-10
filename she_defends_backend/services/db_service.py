@@ -221,6 +221,12 @@ class DBService:
         )
         return result.modified_count > 0 or result.upserted_id is not None
 
+    def is_user_registered(self, uid, email):
+        user = self.db.users.find_one({"uid": uid})
+        if not user and email:
+            user = self.db.users.find_one({"email": email})
+        return user is not None
+
     def record_user_login(self, uid, email):
         from datetime import datetime
         self.db.users.update_one(

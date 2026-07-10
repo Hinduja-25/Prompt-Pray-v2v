@@ -5,16 +5,38 @@ import 'package:flutter/foundation.dart';
 class ApiClient {
   final Dio dio;
   
-  // Set fallback backend URL (localhost for emulator, render in production)
-  static final String _baseUrl = (!kIsWeb && defaultTargetPlatform == TargetPlatform.android)
-      ? 'http://10.0.2.2:5000/api'  // Android Emulator loopback
-      : 'http://localhost:5000/api'; // iOS/Web/Desktop loopback
+  static String activeBaseUrl = (!kIsWeb && defaultTargetPlatform == TargetPlatform.android)
+      ? 'http://10.0.2.2:5000/api'
+      : 'http://localhost:5000/api';
+
+  static final List<String> _candidates = [
+    'http://localhost:5000/api',
+    'http://192.168.29.128:5000/api',
+    'http://10.0.2.2:5000/api',
+  ];
+
+  static Future<void> findActiveBaseUrl() async {
+    for (final url in _candidates) {
+      try {
+        final tempDio = Dio(BaseOptions(
+          connectTimeout: const Duration(milliseconds: 1000),
+        ));
+        final rootUrl = url.replaceAll('/api', '');
+        final res = await tempDio.get(rootUrl);
+        if (res.statusCode == 200) {
+          activeBaseUrl = url;
+          debugPrint("Found active backend URL: $activeBaseUrl");
+          return;
+        }
+      } catch (_) {}
+    }
+  }
 
   // Used for development when Firebase is bypassed
   static String mockEmail = "mock_user";
 
   ApiClient() : dio = Dio(BaseOptions(
-    baseUrl: _baseUrl,
+    baseUrl: activeBaseUrl,
     connectTimeout: const Duration(seconds: 15),
     receiveTimeout: const Duration(seconds: 15),
     headers: {

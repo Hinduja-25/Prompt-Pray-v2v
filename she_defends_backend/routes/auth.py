@@ -9,8 +9,16 @@ auth_bp = Blueprint("auth", __name__)
 def login_user():
     uid = request.uid
     email = request.user_email
+    data = request.json or {}
+    is_signup = data.get("is_signup", False)
+    
+    if not is_signup:
+        if not db_service.is_user_registered(uid, email):
+            return jsonify({"error": "Not registered, please sign up"}), 404
+            
     db_service.record_user_login(uid, email)
     return jsonify({"message": "Login recorded successfully", "uid": uid, "email": email}), 200
+
 
 @auth_bp.route("/profile", methods=["GET"])
 @login_required

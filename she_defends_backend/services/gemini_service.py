@@ -24,12 +24,23 @@ class GeminiService:
             self.model = genai.GenerativeModel(self.model_name)
 
     def _generate_json_with_fallback(self, prompt, mock_fallback_data):
+        openai_key = Config.OPENAI_API_KEY
+        groq_key = Config.GROQ_API_KEY
+        
+        # Auto-detect misconfigured / swapped keys
+        if openai_key.startswith("gsk_"):
+            groq_key = openai_key
+            openai_key = ""
+        elif groq_key.startswith("sk-"):
+            openai_key = groq_key
+            groq_key = ""
+
         # 1. Try OpenAI
-        if hasattr(Config, "OPENAI_API_KEY") and Config.OPENAI_API_KEY:
+        if openai_key:
             try:
                 url = "https://api.openai.com/v1/chat/completions"
                 headers = {
-                    "Authorization": f"Bearer {Config.OPENAI_API_KEY}",
+                    "Authorization": f"Bearer {openai_key}",
                     "Content-Type": "application/json"
                 }
                 payload = {
@@ -57,13 +68,12 @@ class GeminiService:
             except Exception as e:
                 logging.warning(f"Gemini generation failed: {e}. Trying other providers...")
 
-
         # 3. Try Groq (Llama)
-        if hasattr(Config, "GROQ_API_KEY") and Config.GROQ_API_KEY:
+        if groq_key:
             try:
                 url = "https://api.groq.com/openai/v1/chat/completions"
                 headers = {
-                    "Authorization": f"Bearer {Config.GROQ_API_KEY}",
+                    "Authorization": f"Bearer {groq_key}",
                     "Content-Type": "application/json"
                 }
                 payload = {
@@ -82,6 +92,7 @@ class GeminiService:
 
         # 4. Local Mock fallback
         return mock_fallback_data
+
 
     def analyze_symptoms(self, symptoms_text):
         prompt = f"""

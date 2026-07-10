@@ -6,12 +6,17 @@ import 'package:she_defends_app/features/auth/onboarding_screen.dart';
 import 'package:she_defends_app/features/auth/login_screen.dart';
 import 'package:she_defends_app/features/dashboard_wrapper.dart';
 import 'package:she_defends_app/core/services/notification_service.dart';
+import 'package:she_defends_app/core/network/api_client.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
+  // Discover working backend URL based on device environment
+  await ApiClient.findActiveBaseUrl();
+  
   // Initialize local notifications on startup
   await NotificationService().init();
+
   
   runApp(
     const ProviderScope(
