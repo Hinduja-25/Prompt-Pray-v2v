@@ -27,6 +27,7 @@ class _DashboardWrapperState extends ConsumerState<DashboardWrapper> {
   Timer? _systemTimer;
   int _sosElapsedSeconds = 0;
   Timer? _sosElapsedTimer;
+  final _audioPlayer = AudioPlayer();
 
   String _calcDisplay = "0";
   final _apiClient = ApiClient();
@@ -43,6 +44,7 @@ class _DashboardWrapperState extends ConsumerState<DashboardWrapper> {
   void dispose() {
     _systemTimer?.cancel();
     _sosElapsedTimer?.cancel();
+    _audioPlayer.dispose();
     super.dispose();
   }
 
@@ -156,9 +158,6 @@ class _DashboardWrapperState extends ConsumerState<DashboardWrapper> {
     final stealthState = ref.watch(stealthProvider);
     final fakeCallState = ref.watch(fakeCallProvider);
 
-    // Audio player for sirens and ringtones
-    final player = AudioPlayer();
-
     Future<String> getCurrentLocation() async {
       try {
         bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
@@ -194,8 +193,8 @@ class _DashboardWrapperState extends ConsumerState<DashboardWrapper> {
         String location = await getCurrentLocation();
         
         // 2. Play loud police siren
-        await player.setReleaseMode(ReleaseMode.loop);
-        await player.play(UrlSource('https://actions.google.com/sounds/v1/alarms/police_siren.ogg'));
+        await _audioPlayer.setReleaseMode(ReleaseMode.loop);
+        await _audioPlayer.play(UrlSource('https://actions.google.com/sounds/v1/alarms/police_siren.ogg'));
 
         // 3. Send SMS to contacts
         final contacts = ref.read(emergencyContactsProvider);
@@ -225,7 +224,7 @@ class _DashboardWrapperState extends ConsumerState<DashboardWrapper> {
         Future.delayed(const Duration(milliseconds: 600), () => HapticFeedback.heavyImpact());
       } else if (next.status == SosStatus.idle && previous?.status == SosStatus.active) {
         _sosElapsedTimer?.cancel();
-        await player.stop();
+        await _audioPlayer.stop();
       }
     });
 
@@ -235,11 +234,11 @@ class _DashboardWrapperState extends ConsumerState<DashboardWrapper> {
         _startSystemTimer();
       } else if (next.status == FakeCallStatus.ringing && previous?.status != FakeCallStatus.ringing) {
         // Play ringtone
-        await player.setReleaseMode(ReleaseMode.loop);
-        await player.play(UrlSource('https://actions.google.com/sounds/v1/alarms/digital_watch_alarm_long.ogg'));
+        await _audioPlayer.setReleaseMode(ReleaseMode.loop);
+        await _audioPlayer.play(UrlSource('https://actions.google.com/sounds/v1/alarms/digital_watch_alarm_long.ogg'));
       } else if ((next.status == FakeCallStatus.active || next.status == FakeCallStatus.idle) && previous?.status == FakeCallStatus.ringing) {
         // Stop ringtone
-        await player.stop();
+        await _audioPlayer.stop();
       }
     });
 
