@@ -21,7 +21,7 @@ void main() async {
 }
 
 class SheDefendsApp extends ConsumerWidget {
-  const SheDefendsApp({Key? key}) : super(key: key);
+  const SheDefendsApp({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

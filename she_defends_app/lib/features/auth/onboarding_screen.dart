@@ -5,7 +5,7 @@ import 'package:she_defends_app/core/theme/app_theme.dart';
 import 'package:she_defends_app/features/auth/login_screen.dart';
 
 class OnboardingScreen extends ConsumerStatefulWidget {
-  const OnboardingScreen({Key? key}) : super(key: key);
+  const OnboardingScreen({super.key});
 
   @override
   ConsumerState<OnboardingScreen> createState() => _OnboardingScreenState();

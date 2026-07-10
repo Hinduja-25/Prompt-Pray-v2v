@@ -5,7 +5,7 @@ import 'package:she_defends_app/core/theme/app_theme.dart';
 import 'package:she_defends_app/core/network/api_client.dart';
 
 class AssistantChatSheet extends ConsumerStatefulWidget {
-  const AssistantChatSheet({Key? key}) : super(key: key);
+  const AssistantChatSheet({super.key});
 
   @override
   ConsumerState<AssistantChatSheet> createState() => _AssistantChatSheetState();
@@ -136,9 +136,9 @@ class _AssistantChatSheetState extends ConsumerState<AssistantChatSheet> {
               children: [
                 const Text("✨", style: TextStyle(fontSize: 22)),
                 const SizedBox(width: 10),
-                Column(
+                const Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
+                  children: [
                     Text("SheDefends AI Helper", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.primary)),
                     Text("Warm. Empathetic. Protective.", style: TextStyle(fontSize: 12, color: AppColors.textMuted)),
                   ],
@@ -174,7 +174,7 @@ class _AssistantChatSheetState extends ConsumerState<AssistantChatSheet> {
                 children: [
                   CircleAvatar(
                     radius: 16,
-                    backgroundColor: AppColors.lavender.withOpacity(0.5),
+                    backgroundColor: AppColors.lavender.withValues(alpha: 0.5),
                     child: const Text("✨", style: TextStyle(fontSize: 14)),
                   ),
                   const SizedBox(width: 12),
@@ -251,10 +251,10 @@ class _AssistantChatSheetState extends ConsumerState<AssistantChatSheet> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               if (!msg.isUser) ...[
-                CircleAvatar(
+                const CircleAvatar(
                   radius: 16,
                   backgroundColor: AppColors.lavender,
-                  child: const Text("✨", style: TextStyle(fontSize: 14)),
+                  child: Text("✨", style: TextStyle(fontSize: 14)),
                 ),
                 const SizedBox(width: 12),
               ],

@@ -5,56 +5,173 @@ import 'package:she_defends_app/core/theme/app_theme.dart';
 import 'package:she_defends_app/core/network/api_client.dart';
 
 class SafetyScreen extends ConsumerStatefulWidget {
-  const SafetyScreen({Key? key}) : super(key: key);
+  const SafetyScreen({super.key});
 
   @override
   ConsumerState<SafetyScreen> createState() => _SafetyScreenState();
 }
 
-class _SafetyScreenState extends ConsumerState<SafetyScreen> with SingleTickerProviderStateMixin {
-  late TabController _tabController;
-  final _sourceController = TextEditingController();
-  final _destController = TextEditingController();
-  
+class _SafetyScreenState extends ConsumerState<SafetyScreen> {
+  final _destController = TextEditingController(text: "Corporate Plaza, Midtown");
+  final _contactNameController = TextEditingController();
+  final _contactPhoneController = TextEditingController();
+  String _selectedContactCategory = "Family";
+
+  String _selectedRouteType = "safe"; // Default to 'safe'
+  bool _isStealthExpanded = false;
   final _apiClient = ApiClient();
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _syncContactsFromBackend();
   }
 
   @override
   void dispose() {
-    _tabController.dispose();
-    _sourceController.dispose();
     _destController.dispose();
+    _contactNameController.dispose();
+    _contactPhoneController.dispose();
     super.dispose();
   }
 
-  Future<void> _handleStartJourney() async {
-    final src = _sourceController.text.trim();
-    final dest = _destController.text.trim();
-    if (src.isEmpty || dest.isEmpty) return;
+  Future<void> _syncContactsFromBackend() async {
+    try {
+      final res = await _apiClient.get("/safety/contacts");
+      if (res.data is List) {
+        final list = (res.data as List).map((c) => EmergencyContact(
+          id: c["id"] ?? "",
+          name: c["name"] ?? "",
+          phone: c["phone"] ?? "",
+          category: c["category"] ?? "Family",
+        )).toList();
+        ref.read(emergencyContactsProvider.notifier).setContacts(list);
+      }
+    } catch (e) {
+      debugPrint("Failed to load contacts from backend: $e");
+    }
+  }
 
-    // Start Journey state in Riverpod
-    ref.read(guardianProvider.notifier).startJourney(src, dest);
+  Future<void> _handleStartJourney() async {
+    final dest = _destController.text.trim();
+    if (dest.isEmpty) return;
+
+    ref.read(guardianProvider.notifier).startJourney("My Location (GPS)", dest);
     
-    // Sync to backend DB
     try {
       await _apiClient.post("/safety/journey/start", data: {
-        "source": src,
+        "source": "My Location (GPS)",
         "destination": dest,
-        "eta": 25,
+        "eta": 15,
+        "route_type": _selectedRouteType,
       });
     } catch (e) {
-      debugPrint("Failed to sync journey start with backend API: $e");
+      debugPrint("Failed to sync journey with backend: $e");
     }
+  }
+
+  Future<void> _addOrEditContact({String? editId}) async {
+    final name = _contactNameController.text.trim();
+    final phone = _contactPhoneController.text.trim();
+    if (name.isEmpty || phone.isEmpty) return;
+
+    final data = {
+      "name": name,
+      "phone": phone,
+      "category": _selectedContactCategory,
+    };
+    if (editId != null) {
+      data["id"] = editId;
+    }
+
+    try {
+      final res = await _apiClient.post("/safety/contacts", data: data);
+      final savedId = res.data["id"] ?? editId ?? DateTime.now().millisecondsSinceEpoch.toString();
+      
+      if (editId != null) {
+        ref.read(emergencyContactsProvider.notifier).editContact(editId, name, phone, _selectedContactCategory);
+      } else {
+        ref.read(emergencyContactsProvider.notifier).addContact(name, phone, _selectedContactCategory);
+      }
+      
+      _contactNameController.clear();
+      _contactPhoneController.clear();
+      Navigator.pop(context);
+    } catch (e) {
+      debugPrint("Failed to save contact to backend: $e");
+    }
+  }
+
+  Future<void> _deleteContact(String id) async {
+    try {
+      await _apiClient.dio.delete("/safety/contacts/$id");
+      ref.read(emergencyContactsProvider.notifier).removeContact(id);
+    } catch (e) {
+      debugPrint("Failed to delete contact on backend: $e");
+    }
+  }
+
+  void _showContactDialog({EmergencyContact? contact}) {
+    if (contact != null) {
+      _contactNameController.text = contact.name;
+      _contactPhoneController.text = contact.phone;
+      _selectedContactCategory = contact.category;
+    } else {
+      _contactNameController.clear();
+      _contactPhoneController.clear();
+      _selectedContactCategory = "Family";
+    }
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(contact != null ? "Edit Contact" : "Add Emergency Contact", style: const TextStyle(fontWeight: FontWeight.bold)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: _contactNameController,
+              decoration: const InputDecoration(labelText: "Full Name", hintText: "Enter contact name"),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _contactPhoneController,
+              decoration: const InputDecoration(labelText: "Phone Number", hintText: "Enter phone number"),
+              keyboardType: TextInputType.phone,
+            ),
+            const SizedBox(height: 16),
+            DropdownButtonFormField<String>(
+              value: _selectedContactCategory,
+              decoration: const InputDecoration(labelText: "Relationship Category"),
+              items: ["Family", "Friends", "Guardians", "Emergency Services"].map((cat) {
+                return DropdownMenuItem(value: cat, child: Text(cat));
+              }).toList(),
+              onChanged: (val) {
+                if (val != null) {
+                  setState(() => _selectedContactCategory = val);
+                }
+              },
+            )
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
+          ElevatedButton(
+            onPressed: () => _addOrEditContact(editId: contact?.id),
+            child: const Text("Save"),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final guardianState = ref.watch(guardianProvider);
+    final stealthState = ref.watch(stealthProvider);
+    final fakeCallState = ref.watch(fakeCallProvider);
+    final contacts = ref.watch(emergencyContactsProvider);
+
     final isJourneyActive = guardianState.status == GuardianStatus.active || 
                             guardianState.status == GuardianStatus.deviationWarning;
 
@@ -64,264 +181,565 @@ class _SafetyScreenState extends ConsumerState<SafetyScreen> with SingleTickerPr
         backgroundColor: Colors.white,
         elevation: 0,
         title: const Text("Safety Shield", style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold)),
-        bottom: TabBar(
-          controller: _tabController,
-          labelColor: AppColors.primary,
-          unselectedLabelColor: AppColors.textMuted,
-          indicatorColor: AppColors.primary,
-          tabs: const [
-            Tab(text: "Guardian Mode"),
-            Tab(text: "Contacts"),
-            Tab(text: "Nearby Help"),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header status block
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text("Guardian Mode", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppColors.primary)),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: isJourneyActive ? AppColors.success.withOpacity(0.1) : AppColors.textMuted.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: isJourneyActive ? AppColors.success : AppColors.textMuted,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        isJourneyActive ? "Active" : "Inactive",
+                        style: TextStyle(
+                          color: isJourneyActive ? AppColors.success : AppColors.textMuted,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // Main Map Tracking Card or Input Card
+            isJourneyActive 
+                ? _buildActiveJourneyCard(guardianState) 
+                : _buildPlanJourneyCard(),
+
+            // Are You Safe Check-In Prompts (during deviation warnings)
+            if (guardianState.status == GuardianStatus.deviationWarning) ...[
+              const SizedBox(height: 16),
+              _buildDeviationCard(),
+            ],
+
+            const SizedBox(height: 20),
+            
+            // Expandable Stealth & Discreet Settings Card
+            _buildStealthConfigCard(stealthState),
+
+            const SizedBox(height: 24),
+
+            // Emergency Contacts Section
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text("Emergency Contacts", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.primary)),
+                TextButton.icon(
+                  onPressed: () => _showContactDialog(),
+                  icon: const Icon(Icons.add, size: 16),
+                  label: const Text("Add", style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            _buildContactsList(contacts),
+
+            const SizedBox(height: 24),
+
+            // Nearby Safe Havens Section
+            const Text("Nearby Safe Havens", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.primary)),
+            const SizedBox(height: 12),
+            _buildNearbyPlaces(),
+            const SizedBox(height: 40),
           ],
         ),
-      ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          _buildGuardianTab(isJourneyActive, guardianState),
-          _buildContactsTab(),
-          _buildNearbyTab(),
-        ],
       ),
     );
   }
 
-  // --- Guardian Mode Tab UI ---
-  Widget _buildGuardianTab(bool isActive, GuardianState state) {
-    if (isActive) {
-      return SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          children: [
-            // Simulation Map Mock Card using SVG path style
-            Card(
-              clipBehavior: Clip.antiAlias,
-              child: Column(
-                children: [
-                  Container(
-                    height: 200,
-                    color: const Color(0xFFE5E7EB),
-                    alignment: Alignment.center,
-                    child: Stack(
-                      children: [
-                        // Mock grid lines and route path
-                        Positioned.fill(
-                          child: CustomPaint(
-                            painter: MapRoutePainter(),
-                          ),
-                        ),
-                        Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: const [
-                              Icon(Icons.navigation, color: AppColors.primaryActive, size: 28),
-                              SizedBox(height: 4),
-                              Text("GPS Active tracking...", style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 11)),
-                            ],
-                          ),
-                        )
-                      ],
-                    ),
-                  ),
-                  ListTile(
-                    title: const Text("Live Journey Tracking", style: TextStyle(fontWeight: FontWeight.bold)),
-                    subtitle: Text("${state.source} ➔ ${state.destination}"),
-                    trailing: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: AppColors.success.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        "Risk: ${(state.riskScore * 100).toInt()}%",
-                        style: const TextStyle(color: AppColors.success, fontWeight: FontWeight.bold, fontSize: 11),
-                      ),
-                    ),
-                  )
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
-
-            // Journey metrics
-            Row(
+  // --- Active Journey Map Card ---
+  Widget _buildActiveJourneyCard(GuardianState state) {
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      elevation: 0,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18), side: BorderSide(color: Colors.grey.shade200)),
+      child: Column(
+        children: [
+          Container(
+            height: 220,
+            color: const Color(0xFFE5E7EB),
+            alignment: Alignment.center,
+            child: Stack(
               children: [
-                Expanded(
+                Positioned.fill(
+                  child: CustomPaint(
+                    painter: MapRoutePainter(routeType: _selectedRouteType),
+                  ),
+                ),
+                Positioned(
+                  top: 12,
+                  left: 12,
                   child: Card(
+                    color: _selectedRouteType == "safe" ? AppColors.success : AppColors.primary,
                     child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
+                      padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+                      child: Row(
                         children: [
-                          const Text("ETA Remaining", style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
-                          const SizedBox(height: 4),
-                          Text("${state.remainingMinutes} Mins", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                          Icon(_selectedRouteType == "safe" ? Icons.shield : Icons.navigation, color: Colors.white, size: 14),
+                          const SizedBox(width: 4),
+                          Text(
+                            _selectedRouteType == "safe" ? "Safe Route Active" : "Fastest Route",
+                            style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                          ),
                         ],
                       ),
                     ),
                   ),
                 ),
-                const SizedBox(width: 16),
-                Expanded(
+                Positioned(
+                  top: 12,
+                  right: 12,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(color: Colors.black.withOpacity(0.6), borderRadius: BorderRadius.circular(8)),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.gps_fixed, color: Colors.green, size: 12),
+                        SizedBox(width: 4),
+                        Text("GPS ACTIVE", style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                  ),
+                ),
+                // Floating Address Panel
+                Positioned(
+                  top: 60,
+                  left: 20,
+                  right: 20,
                   child: Card(
+                    elevation: 4,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
+                      padding: const EdgeInsets.all(12),
+                      child: Row(
                         children: [
-                          const Text("Speed", style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
-                          const SizedBox(height: 4),
-                          Text("${state.speed} mph", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                          const Column(
+                            children: [
+                              Icon(Icons.my_location, color: AppColors.primaryActive, size: 16),
+                              SizedBox(height: 8),
+                              Icon(Icons.more_vert, color: AppColors.textMuted, size: 12),
+                              SizedBox(height: 8),
+                              Icon(Icons.location_on, color: AppColors.emergency, size: 16),
+                            ],
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text("Current Location", style: TextStyle(color: AppColors.textMuted, fontSize: 10)),
+                                const Text("5th Avenue, Manhattan", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                const SizedBox(height: 10),
+                                const Text("Destination", style: TextStyle(color: AppColors.textMuted, fontSize: 10)),
+                                Text(state.destination, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                              ],
+                            ),
+                          )
                         ],
                       ),
+                    ),
+                  ),
+                )
+              ],
+            ),
+          ),
+          
+          // Metrics Row
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _buildMetricColumn("ETA", "${state.remainingMinutes} mins"),
+                _buildMetricColumn("Distance", "4.2 km"),
+                _buildMetricColumn("Risk Score", "Low", color: AppColors.success),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          
+          // Active Actions Bar: End Journey, Fake Call, Audio Record
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      flex: 2,
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          ref.read(guardianProvider.notifier).reset();
+                        },
+                        icon: const Icon(Icons.cancel_outlined, size: 18),
+                        label: const Text("End Journey"),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.grey.shade200,
+                          foregroundColor: Colors.black87,
+                          elevation: 0,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      flex: 3,
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          ref.read(fakeCallProvider.notifier).triggerIncomingCall();
+                        },
+                        icon: const Icon(Icons.phone_in_talk, size: 18),
+                        label: const Text("Fake Call"),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      _uploadMockAudioClip();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text("Ambient Audio Recording stashed successfully!")),
+                      );
+                    },
+                    icon: const Icon(Icons.mic, color: AppColors.emergency),
+                    label: const Text("Stash Audio Recording", style: TextStyle(color: AppColors.emergency)),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: AppColors.emergency),
                     ),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 32),
-
-            // Simulator Control Panel
-            Card(
-              color: AppColors.lavender.withOpacity(0.3),
-              shape: RoundedRectangleBorder(
-                side: const BorderSide(color: AppColors.lavender),
-                borderRadius: BorderRadius.circular(18),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(20.0),
-                child: Column(
-                  children: [
-                    const Text("JOURNEY SIMULATOR", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.primary)),
-                    const SizedBox(height: 12),
-                    const Text("Test safety checks by simulating real travel events.", style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: () {
-                              ref.read(guardianProvider.notifier).triggerDeviation();
-                            },
-                            style: OutlinedButton.styleFrom(side: const BorderSide(color: AppColors.warning)),
-                            child: const Text("Simulate Deviation", style: TextStyle(color: AppColors.warning)),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: ElevatedButton(
-                            onPressed: () {
-                              ref.read(guardianProvider.notifier).reset();
-                            },
-                            style: ElevatedButton.styleFrom(backgroundColor: AppColors.success),
-                            child: const Text("Arrived Safely"),
-                          ),
-                        ),
-                      ],
-                    )
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text("Plan a Safe Journey", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppColors.primary)),
-          const SizedBox(height: 8),
-          const Text("Enter your travel coordinates. Guardian Mode will check on you if your GPS stops or deviates.", style: TextStyle(color: AppColors.textMuted)),
-          const SizedBox(height: 32),
-
-          const Text("Starting Location", style: TextStyle(fontWeight: FontWeight.w600)),
-          const SizedBox(height: 8),
-          TextField(
-            controller: _sourceController,
-            decoration: const InputDecoration(
-              hintText: "Enter source address",
-              prefixIcon: Icon(Icons.my_location, color: AppColors.textMuted),
-            ),
-          ),
-          const SizedBox(height: 20),
-
-          const Text("Destination", style: TextStyle(fontWeight: FontWeight.w600)),
-          const SizedBox(height: 8),
-          TextField(
-            controller: _destController,
-            decoration: const InputDecoration(
-              hintText: "Enter destination address",
-              prefixIcon: Icon(Icons.location_on_outlined, color: AppColors.textMuted),
-            ),
-          ),
-          const SizedBox(height: 32),
-
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: _handleStartJourney,
-              icon: const Icon(Icons.navigation),
-              label: const Text("Start Journey"),
-            ),
           ),
         ],
       ),
     );
   }
 
-  // --- Contacts Tab UI ---
-  Widget _buildContactsTab() {
-    final profile = ref.watch(userProfileProvider);
-    final list = profile.emergencyContacts;
-
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: list.isEmpty
-          ? const Center(child: Text("No emergency contacts set yet", style: TextStyle(color: AppColors.textMuted)))
-          : ListView.builder(
-              padding: const EdgeInsets.all(24),
-              itemCount: list.length,
-              itemBuilder: (context, index) {
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  child: ListTile(
-                    leading: const CircleAvatar(
-                      backgroundColor: AppColors.lavender,
-                      child: Icon(Icons.person, color: AppColors.primary),
-                    ),
-                    title: Text("Guardian ${index + 1}"),
-                    subtitle: Text(list[index]),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
+  // --- Plan/Start Journey Card ---
+  Widget _buildPlanJourneyCard() {
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18), side: BorderSide(color: Colors.grey.shade200)),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text("Start a Monitored Journey", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            const SizedBox(height: 16),
+            
+            // Current GPS Location indicator
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.success.withOpacity(0.06),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.success.withOpacity(0.2)),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.gps_fixed, color: AppColors.success, size: 18),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        IconButton(icon: const Icon(Icons.message_outlined, color: AppColors.primaryActive), onPressed: () {}),
-                        IconButton(icon: const Icon(Icons.phone_outlined, color: AppColors.success), onPressed: () {}),
+                        Text("Current Location (GPS)", style: TextStyle(fontSize: 10, color: AppColors.success, fontWeight: FontWeight.bold)),
+                        SizedBox(height: 2),
+                        Text("5th Avenue, Manhattan", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                       ],
                     ),
                   ),
-                );
-              },
+                ],
+              ),
             ),
+            const SizedBox(height: 16),
+            
+            const Text("Destination", style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
+            const SizedBox(height: 6),
+            TextField(
+              controller: _destController,
+              decoration: const InputDecoration(
+                hintText: "Enter destination address",
+                prefixIcon: Icon(Icons.location_on, color: AppColors.emergency),
+              ),
+            ),
+            const SizedBox(height: 16),
+            
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text("Strategy:", style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
+                Row(
+                  children: [
+                    ChoiceChip(
+                      label: const Text("Fastest"),
+                      selected: _selectedRouteType == "fastest",
+                      onSelected: (sel) {
+                        if (sel) setState(() => _selectedRouteType = "fastest");
+                      },
+                    ),
+                    const SizedBox(width: 8),
+                    ChoiceChip(
+                      label: const Text("Safe Route"),
+                      selected: _selectedRouteType == "safe",
+                      onSelected: (sel) {
+                        if (sel) setState(() => _selectedRouteType = "safe");
+                      },
+                    ),
+                  ],
+                )
+              ],
+            ),
+            const SizedBox(height: 20),
+            
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _handleStartJourney,
+                icon: const Icon(Icons.navigation),
+                label: const Text("Start Monitored Journey"),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
-  // --- Nearby Safe Places Tab UI ---
-  Widget _buildNearbyTab() {
-    final List<Map<String, String>> locations = [
-      {"name": "St. Mary Medical Center", "dist": "0.8 miles away", "phone": "555-0199", "type": "Hospital"},
-      {"name": "Central Police Precinct", "dist": "1.2 miles away", "phone": "555-0144", "type": "Police Station"},
-      {"name": "SafeHaven Community Center", "dist": "1.5 miles away", "phone": "555-0122", "type": "Safe Place"},
-      {"name": "24/7 Downtown Pharmacy", "dist": "1.8 miles away", "phone": "555-0188", "type": "Pharmacy"},
+  // --- Deviation Warning Card ---
+  Widget _buildDeviationCard() {
+    return Card(
+      color: AppColors.emergency.withOpacity(0.04),
+      shape: RoundedRectangleBorder(side: const BorderSide(color: AppColors.emergency, width: 1.5), borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            const Row(
+              children: [
+                Icon(Icons.warning, color: AppColors.warning),
+                SizedBox(width: 12),
+                Text("Are you safe?", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.emergency)),
+              ],
+            ),
+            const SizedBox(height: 8),
+            const Text("A route deviation was detected. Let us know if you need assistance.", style: TextStyle(color: AppColors.textMuted, fontSize: 13)),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () {
+                      ref.read(guardianProvider.notifier).reset();
+                      ref.read(sosProvider.notifier).startCountdown();
+                    },
+                    style: OutlinedButton.styleFrom(side: const BorderSide(color: AppColors.emergency)),
+                    child: const Text("Need Help", style: TextStyle(color: AppColors.emergency)),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () {
+                      ref.read(guardianProvider.notifier).resolveDeviation();
+                    },
+                    style: ElevatedButton.styleFrom(backgroundColor: AppColors.success),
+                    child: const Text("I'm Safe"),
+                  ),
+                ),
+              ],
+            )
+          ],
+        ),
+      ),
+    );
+  }
+
+  // --- Expandable Stealth Config Card ---
+  Widget _buildStealthConfigCard(StealthState state) {
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: Colors.grey.shade200)),
+      child: ExpansionTile(
+        initiallyExpanded: _isStealthExpanded,
+        title: const Text("Stealth & Discreet Alarms", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.primary)),
+        subtitle: const Text("Calculator decoy lock, shake triggers, and silent SOS"),
+        leading: const Icon(Icons.security, color: AppColors.primary),
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Column(
+              children: [
+                SwitchListTile(
+                  title: const Text("Calculator Decoy Lock", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                  subtitle: const Text("Hides app behind a working calculator decoy. Enter PIN to unlock."),
+                  value: state.isCalculatorLockEnabled,
+                  activeColor: AppColors.primary,
+                  contentPadding: EdgeInsets.zero,
+                  onChanged: (val) {
+                    ref.read(stealthProvider.notifier).toggleCalculatorLock(val);
+                  },
+                ),
+                if (state.isCalculatorLockEnabled) ...[
+                  ListTile(
+                    title: const Text("Secret Decoy Unlock PIN", style: TextStyle(fontSize: 12)),
+                    trailing: Text(state.pin, style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary, fontSize: 14)),
+                    contentPadding: EdgeInsets.zero,
+                    onTap: () {
+                      _showPinDialog(state.pin);
+                    },
+                  )
+                ],
+                const Divider(),
+                SwitchListTile(
+                  title: const Text("Silent SOS Alerts", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                  subtitle: const Text("Broadcasts distress coordinates silently without sounding alarms."),
+                  value: state.isSilentSosEnabled,
+                  activeColor: AppColors.primary,
+                  contentPadding: EdgeInsets.zero,
+                  onChanged: (val) {
+                    ref.read(stealthProvider.notifier).toggleSilentSos(val);
+                  },
+                ),
+                const Divider(),
+                SwitchListTile(
+                  title: const Text("Shake Phone to Alert", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                  subtitle: const Text("Trigger distress alert automatically by shaking the device."),
+                  value: state.isShakeToSosEnabled,
+                  activeColor: AppColors.primary,
+                  contentPadding: EdgeInsets.zero,
+                  onChanged: (val) {
+                    ref.read(stealthProvider.notifier).toggleShakeToSos(val);
+                  },
+                ),
+                if (state.isShakeToSosEnabled) ...[
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      const Text("Sensitivity: ", style: TextStyle(fontSize: 11, color: AppColors.textMuted)),
+                      Expanded(
+                        child: Slider(
+                          value: state.shakeSensitivity,
+                          min: 0.1,
+                          max: 1.0,
+                          onChanged: (val) {
+                            ref.read(stealthProvider.notifier).setShakeSensitivity(val);
+                          },
+                        ),
+                      ),
+                      Text(state.shakeSensitivity.toStringAsFixed(1), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    onPressed: () {
+                      ref.read(sosProvider.notifier).startCountdown();
+                    },
+                    icon: const Icon(Icons.vibration, size: 16),
+                    label: const Text("Simulate Shake Event"),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.emergency,
+                      side: const BorderSide(color: AppColors.emergency),
+                    ),
+                  )
+                ],
+              ],
+            ),
+          )
+        ],
+      ),
+    );
+  }
+
+  // --- Contacts List ---
+  Widget _buildContactsList(List<EmergencyContact> contacts) {
+    if (contacts.isEmpty) {
+      return Container(
+        height: 100,
+        alignment: Alignment.center,
+        child: const Text("No trusted contacts configured", style: TextStyle(color: AppColors.textMuted)),
+      );
+    }
+
+    return ListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: contacts.length,
+      itemBuilder: (context, index) {
+        final contact = contacts[index];
+        return Card(
+          margin: const EdgeInsets.only(bottom: 10),
+          child: ListTile(
+            leading: CircleAvatar(
+              backgroundColor: AppColors.lavender,
+              child: Text(contact.category[0].toUpperCase(), style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold)),
+            ),
+            title: Text(contact.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+            subtitle: Text("${contact.phone} • ${contact.category}"),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.edit_outlined, size: 18, color: AppColors.textMuted),
+                  onPressed: () => _showContactDialog(contact: contact),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.delete_outline_rounded, size: 18, color: AppColors.emergency),
+                  onPressed: () => _deleteContact(contact.id),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // --- Nearby Safe Places ---
+  Widget _buildNearbyPlaces() {
+    final List<Map<String, String>> mockLocations = [
+      {"name": "St. Mary Medical Center", "dist": "0.8 miles", "phone": "555-0199", "type": "Hospital"},
+      {"name": "Central Police Precinct", "dist": "1.2 miles", "phone": "555-0144", "type": "Police Station"},
+      {"name": "SafeHaven Community Center", "dist": "1.5 miles", "phone": "555-0122", "type": "Safe Place"},
+      {"name": "24/7 Downtown Pharmacy", "dist": "1.8 miles", "phone": "555-0188", "type": "Pharmacy"},
     ];
 
     return ListView.builder(
-      padding: const EdgeInsets.all(24),
-      itemCount: locations.length,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: mockLocations.length,
       itemBuilder: (context, index) {
-        final loc = locations[index];
+        final loc = mockLocations[index];
         IconData icon = Icons.local_hospital;
         Color color = AppColors.emergency;
         
@@ -337,19 +755,106 @@ class _SafetyScreenState extends ConsumerState<SafetyScreen> with SingleTickerPr
         }
 
         return Card(
-          margin: const EdgeInsets.only(bottom: 12),
+          margin: const EdgeInsets.only(bottom: 10),
           child: ListTile(
             leading: CircleAvatar(
               backgroundColor: color.withOpacity(0.1),
-              child: Icon(icon, color: color),
+              child: Icon(icon, color: color, size: 20),
             ),
-            title: Text(loc["name"]!, style: const TextStyle(fontWeight: FontWeight.bold)),
-            subtitle: Text("${loc["type"]} • ${loc["dist"]}"),
-            trailing: IconButton(
-              icon: const Icon(Icons.directions, color: AppColors.primary),
-              onPressed: () {},
+            title: Text(loc["name"]!, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+            subtitle: Text("${loc["type"]} • ${loc["dist"]} away"),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.phone_outlined, color: AppColors.success, size: 20),
+                  onPressed: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text("Dialing ${loc['name']} (${loc['phone']})...")),
+                    );
+                  },
+                ),
+                IconButton(
+                  icon: const Icon(Icons.directions, color: AppColors.primary, size: 20),
+                  onPressed: () {
+                    setState(() {
+                      _destController.text = loc["name"]!;
+                      _selectedRouteType = "safe";
+                    });
+                    _handleStartJourney();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text("Routing secure path to ${loc['name']}...")),
+                    );
+                  },
+                ),
+              ],
             ),
           ),
+        );
+      },
+    );
+  }
+
+  // --- Helper Widgets ---
+  Widget _buildMetricColumn(String label, String value, {Color? color}) {
+    return Column(
+      children: [
+        Text(label, style: const TextStyle(color: AppColors.textMuted, fontSize: 10, fontWeight: FontWeight.w600)),
+        const SizedBox(height: 4),
+        Text(
+          value, 
+          style: TextStyle(
+            fontWeight: FontWeight.bold, 
+            fontSize: 15, 
+            color: color ?? AppColors.primary,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _uploadMockAudioClip() async {
+    final clipNum = ref.read(sosProvider).recordings.length + 1;
+    final filename = "SOS_Record_Clip_#$clipNum.mp3";
+    try {
+      final res = await _apiClient.post("/safety/recordings", data: {
+        "filename": filename,
+        "duration": "0:30",
+        "size": "120 KB",
+      });
+      if (res.data["recording"] != null) {
+        ref.read(sosProvider.notifier).addMockRecording(filename, "0:30", "120 KB");
+      }
+    } catch (e) {
+      debugPrint("Failed to sync recording with backend: $e");
+    }
+  }
+
+  void _showPinDialog(String currentPin) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        final controller = TextEditingController(text: currentPin);
+        return AlertDialog(
+          title: const Text("Set Decoy Unlock PIN"),
+          content: TextField(
+            controller: controller,
+            keyboardType: TextInputType.number,
+            maxLength: 6,
+            decoration: const InputDecoration(hintText: "Enter numeric code"),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
+            ElevatedButton(
+              onPressed: () {
+                if (controller.text.trim().isNotEmpty) {
+                  ref.read(stealthProvider.notifier).setPin(controller.text.trim());
+                }
+                Navigator.pop(context);
+              },
+              child: const Text("Set PIN"),
+            )
+          ],
         );
       },
     );
@@ -358,35 +863,62 @@ class _SafetyScreenState extends ConsumerState<SafetyScreen> with SingleTickerPr
 
 // Simple path painter to simulate map on Canvas
 class MapRoutePainter extends CustomPainter {
+  final String routeType;
+  MapRoutePainter({required this.routeType});
+
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = AppColors.primary.withOpacity(0.3)
+    final gridPaint = Paint()
+      ..color = Colors.grey.withOpacity(0.15)
+      ..strokeWidth = 1.0;
+    
+    for (double i = 0; i < size.width; i += 30) {
+      canvas.drawLine(Offset(i, 0), Offset(i, size.height), gridPaint);
+    }
+    for (double j = 0; j < size.height; j += 30) {
+      canvas.drawLine(Offset(0, j), Offset(size.width, j), gridPaint);
+    }
+
+    final pathPaint = Paint()
+      ..color = routeType == 'safe' ? AppColors.success : AppColors.primary.withOpacity(0.4)
       ..strokeWidth = 6.0
       ..strokeCap = StrokeCap.round
       ..style = PaintingStyle.stroke;
 
     final path = Path();
     path.moveTo(size.width * 0.1, size.height * 0.8);
-    path.quadraticBezierTo(
-      size.width * 0.3,
-      size.height * 0.2,
-      size.width * 0.5,
-      size.height * 0.5,
-    );
-    path.lineTo(size.width * 0.9, size.height * 0.2);
+    
+    if (routeType == 'safe') {
+      path.lineTo(size.width * 0.35, size.height * 0.7);
+      path.lineTo(size.width * 0.45, size.height * 0.45);
+      path.lineTo(size.width * 0.7, size.height * 0.35);
+      path.lineTo(size.width * 0.9, size.height * 0.2);
+    } else {
+      path.quadraticBezierTo(
+        size.width * 0.35,
+        size.height * 0.35,
+        size.width * 0.9,
+        size.height * 0.2,
+      );
+    }
 
-    canvas.drawPath(path, paint);
+    canvas.drawPath(path, pathPaint);
 
-    // Draw grid intersections
-    final dotPaint = Paint()
-      ..color = Colors.grey.withOpacity(0.4)
-      ..style = PaintingStyle.fill;
-      
-    canvas.drawCircle(Offset(size.width * 0.1, size.height * 0.8), 8, dotPaint);
-    canvas.drawCircle(Offset(size.width * 0.9, size.height * 0.2), 8, dotPaint);
+    final landmarkPaint = Paint()..style = PaintingStyle.fill;
+
+    if (routeType == 'safe') {
+      landmarkPaint.color = AppColors.success;
+      canvas.drawCircle(Offset(size.width * 0.35, size.height * 0.7), 6, landmarkPaint);
+      canvas.drawCircle(Offset(size.width * 0.7, size.height * 0.35), 6, landmarkPaint);
+    }
+    
+    final startPaint = Paint()..color = AppColors.primaryActive..style = PaintingStyle.fill;
+    final endPaint = Paint()..color = AppColors.emergency..style = PaintingStyle.fill;
+    
+    canvas.drawCircle(Offset(size.width * 0.1, size.height * 0.8), 8, startPaint);
+    canvas.drawCircle(Offset(size.width * 0.9, size.height * 0.2), 8, endPaint);
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant MapRoutePainter oldDelegate) => oldDelegate.routeType != routeType;
 }

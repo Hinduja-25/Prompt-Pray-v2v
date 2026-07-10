@@ -5,7 +5,7 @@ import 'package:she_defends_app/core/theme/app_theme.dart';
 import 'package:she_defends_app/features/dashboard_wrapper.dart';
 
 class SetupScreen extends ConsumerStatefulWidget {
-  const SetupScreen({Key? key}) : super(key: key);
+  const SetupScreen({super.key});
 
   @override
   ConsumerState<SetupScreen> createState() => _SetupScreenState();
@@ -198,7 +198,7 @@ class _SetupScreenState extends ConsumerState<SetupScreen> {
             const Text("Preferred Language", style: TextStyle(fontWeight: FontWeight.w600)),
             const SizedBox(height: 8),
             DropdownButtonFormField<String>(
-              value: _selectedLang,
+              initialValue: _selectedLang,
               decoration: const InputDecoration(),
               items: _languages.map((lang) => DropdownMenuItem(
                 value: lang,
@@ -225,7 +225,7 @@ class _SetupScreenState extends ConsumerState<SetupScreen> {
             const Text("Blood Group", style: TextStyle(fontWeight: FontWeight.w600)),
             const SizedBox(height: 8),
             DropdownButtonFormField<String>(
-              value: _selectedBlood,
+              initialValue: _selectedBlood,
               decoration: const InputDecoration(),
               items: _bloodGroups.map((bg) => DropdownMenuItem(
                 value: bg,

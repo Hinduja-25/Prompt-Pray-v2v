@@ -72,15 +72,31 @@ def trigger_sos():
     uid = request.uid
     data = request.json or {}
     
-    # Store SOS log in database
+    battery = data.get("battery", 100)
+    speed = data.get("speed", 0.0)
+    location = data.get("location", "Unknown Location")
+    phone = data.get("phone", "Unknown Phone")
+    msg = data.get("message", "I may be in danger. This is my live location. Please help immediately.")
+    
     sos_log = {
         "timestamp": datetime.utcnow().isoformat(),
-        "location": data.get("location", None),
+        "location": location,
+        "speed": speed,
+        "battery": battery,
         "status": "triggered"
     }
     
     # Trigger SMS mock alert output log
-    print(f"[EMERGENCY SOS TRIGGERED] User UID: {uid} at location: {sos_log['location']}")
+    print("=" * 60)
+    print("!!! EMERGENCY SOS TRIGGERED !!!")
+    print(f"User UID: {uid}")
+    print(f"Phone: {phone}")
+    print(f"Battery: {battery}%")
+    print(f"Current Speed: {speed} mph")
+    print(f"Location: {location}")
+    print(f"Distress Message: '{msg}'")
+    print(f"Live Map Link: https://maps.google.com/?q={location.replace(' ', '')}")
+    print("=" * 60)
     
     db_service.add_symptom_log(uid, {
         "symptoms": "EMERGENCY SOS ALERT ACTIVATED",
@@ -95,3 +111,69 @@ def trigger_sos():
     })
     
     return jsonify({"message": "SOS alert processed successfully", "sos_log": sos_log}), 200
+
+@safety_bp.route("/contacts", methods=["GET"])
+@login_required
+def get_contacts():
+    uid = request.uid
+    contacts = db_service.get_emergency_contacts(uid)
+    return jsonify(contacts), 200
+
+@safety_bp.route("/contacts", methods=["POST"])
+@login_required
+def save_contact():
+    uid = request.uid
+    data = request.json
+    if not data or "name" not in data or "phone" not in data:
+        return jsonify({"error": "Missing name or phone"}), 400
+    
+    contact_id = db_service.save_emergency_contact(uid, data)
+    return jsonify({"message": "Contact saved successfully", "id": contact_id}), 200
+
+@safety_bp.route("/contacts/<contact_id>", methods=["DELETE"])
+@login_required
+def delete_contact(contact_id):
+    uid = request.uid
+    success = db_service.delete_emergency_contact(uid, contact_id)
+    if success:
+        return jsonify({"message": "Contact deleted successfully"}), 200
+    else:
+        return jsonify({"error": "Contact not found or could not be deleted"}), 404
+
+@safety_bp.route("/recordings", methods=["GET"])
+@login_required
+def get_recordings():
+    uid = request.uid
+    recordings = db_service.get_emergency_recordings(uid)
+    return jsonify(recordings), 200
+
+@safety_bp.route("/recordings", methods=["POST"])
+@login_required
+def upload_recording():
+    uid = request.uid
+    data = request.json
+    if not data or "filename" not in data:
+        return jsonify({"error": "Missing filename"}), 400
+    
+    recording_data = {
+        "filename": data["filename"],
+        "timestamp": datetime.utcnow().isoformat(),
+        "duration": data.get("duration", "0:00"),
+        "size": data.get("size", "0 KB")
+    }
+    recording_id = db_service.add_emergency_recording(uid, recording_data)
+    recording_data["id"] = recording_id
+    recording_data.pop("_id", None)  # Remove MongoDB ObjectId to prevent JSON serialization error
+    return jsonify({"message": "Recording uploaded successfully", "recording": recording_data}), 200
+
+@safety_bp.route("/safe-places", methods=["GET"])
+@login_required
+def get_safe_places():
+    places = [
+        {"name": "St. Mary Medical Center", "dist": "0.8 miles away", "phone": "555-0199", "type": "Hospital", "address": "123 Health Ave", "status": "Open 24/7"},
+        {"name": "Central Police Precinct", "dist": "1.2 miles away", "phone": "555-0144", "type": "Police Station", "address": "456 Safety St", "status": "Open 24/7"},
+        {"name": "SafeHaven Community Center", "dist": "1.5 miles away", "phone": "555-0122", "type": "Safe Place", "address": "789 Care Rd", "status": "Open 08:00 AM - 10:00 PM"},
+        {"name": "24/7 Downtown Pharmacy", "dist": "1.8 miles away", "phone": "555-0188", "type": "Pharmacy", "address": "101 Pill Blvd", "status": "Open 24/7"},
+        {"name": "Women's Crisis Helpline Office", "dist": "2.1 miles away", "phone": "555-0211", "type": "Safe Place", "address": "202 Support Dr", "status": "Open 24/7"},
+    ]
+    return jsonify(places), 200

@@ -5,7 +5,7 @@ import 'package:she_defends_app/core/theme/app_theme.dart';
 import 'package:she_defends_app/features/assistant/assistant_chat_sheet.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
-  const HomeScreen({Key? key}) : super(key: key);
+  const HomeScreen({super.key});
 
   @override
   ConsumerState<HomeScreen> createState() => _HomeScreenState();
@@ -120,16 +120,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           );
         },
         borderRadius: BorderRadius.circular(18),
-        child: Padding(
-          padding: const EdgeInsets.all(20.0),
+        child: const Padding(
+          padding: EdgeInsets.all(20.0),
           child: Row(
             children: [
-              const Text("✨", style: TextStyle(fontSize: 32)),
-              const SizedBox(width: 16),
+              Text("✨", style: TextStyle(fontSize: 32)),
+              SizedBox(width: 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
+                  children: [
                     Text(
                       "Assistant Tip",
                       style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary, fontSize: 13),
@@ -142,7 +142,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right, color: AppColors.primary),
+              Icon(Icons.chevron_right, color: AppColors.primary),
             ],
           ),
         ),
@@ -152,6 +152,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   // --- Emergency SOS Card ---
   Widget _buildSosCard() {
+    final sosState = ref.watch(sosProvider);
+
     return Card(
       elevation: 0,
       color: AppColors.emergency.withOpacity(0.04),
@@ -161,36 +163,101 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       ),
       child: Padding(
         padding: const EdgeInsets.all(20.0),
-        child: Row(
+        child: Column(
           children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: const [
-                  Text("Emergency Assistance", style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.emergency, fontSize: 15)),
-                  SizedBox(height: 4),
-                  Text("Tap and hold to broadcast your live GPS to your guardians and call helpers.", style: TextStyle(color: AppColors.textMuted, fontSize: 13)),
-                ],
-              ),
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        "Emergency Assistance",
+                        style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.emergency, fontSize: 16),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        sosState.isOneTapTrigger
+                            ? "Tap the SOS button to instantly broadcast your live GPS to your guardians."
+                            : "Long press the SOS button to broadcast your live GPS to your guardians.",
+                        style: const TextStyle(color: AppColors.textMuted, fontSize: 13),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 16),
+                GestureDetector(
+                  onTap: () {
+                    if (sosState.isOneTapTrigger) {
+                      ref.read(sosProvider.notifier).startCountdown();
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text("Long-press required (or enable One-Tap trigger below)"),
+                          duration: Duration(seconds: 2),
+                        ),
+                      );
+                    }
+                  },
+                  onLongPress: () {
+                    if (!sosState.isOneTapTrigger) {
+                      ref.read(sosProvider.notifier).startCountdown();
+                    }
+                  },
+                  child: Container(
+                    width: 72,
+                    height: 72,
+                    decoration: BoxDecoration(
+                      color: AppColors.emergency,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.emergency.withOpacity(0.3),
+                          blurRadius: 16,
+                          spreadRadius: 4,
+                        ),
+                      ],
+                    ),
+                    alignment: Alignment.center,
+                    child: const Text(
+                      "SOS",
+                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
+                    ),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(width: 16),
-            GestureDetector(
-              onLongPress: () {
-                ref.read(sosProvider.notifier).startCountdown();
-              },
-              child: Container(
-                width: 64,
-                height: 64,
-                decoration: const BoxDecoration(
-                  color: AppColors.emergency,
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(color: Color(0x33EF4444), blurRadius: 12, offset: Offset(0, 4)),
+            const Divider(height: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.touch_app_outlined, size: 16, color: AppColors.textMuted),
+                    const SizedBox(width: 4),
+                    const Text("One-Tap Trigger", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textMuted)),
+                    const SizedBox(width: 8),
+                    SizedBox(
+                      height: 24,
+                      child: Switch(
+                        value: sosState.isOneTapTrigger,
+                        onChanged: (val) {
+                          ref.read(sosProvider.notifier).toggleTriggerMode(val);
+                        },
+                        activeColor: AppColors.emergency,
+                      ),
+                    ),
                   ],
                 ),
-                alignment: Alignment.center,
-                child: const Text("SOS", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-              ),
+                TextButton.icon(
+                  onPressed: () {
+                    ref.read(currentTabProvider.notifier).state = 2; // Route to Safety tab
+                  },
+                  icon: const Icon(Icons.settings_outlined, size: 14, color: AppColors.primary),
+                  label: const Text("Safety Settings", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.primary)),
+                  style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: Size.zero),
+                ),
+              ],
             ),
           ],
         ),
@@ -212,7 +279,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 const Text("Health Snapshot", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.primary)),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(color: AppColors.success.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
+                  decoration: BoxDecoration(color: AppColors.success.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
                   child: const Text("Score: 82", style: TextStyle(color: AppColors.success, fontWeight: FontWeight.bold, fontSize: 12)),
                 ),
               ],
@@ -330,37 +397,37 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   // --- Wellness Card ---
   Widget _buildWellnessSnapshot() {
-    return Card(
+    return const Card(
       child: Padding(
-        padding: const EdgeInsets.all(20.0),
+        padding: EdgeInsets.all(20.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text("Wellness Snapshot", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.primary)),
-            const SizedBox(height: 16),
+            Text("Wellness Snapshot", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.primary)),
+            SizedBox(height: 16),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Row(
-                  children: const [
+                  children: [
                     Text("😊", style: TextStyle(fontSize: 24)),
                     SizedBox(width: 12),
                     Text("Today's Mood: Feeling Good", style: TextStyle(fontWeight: FontWeight.w500)),
                   ],
                 ),
-                const Text("Sleep: 7.5 hrs", style: TextStyle(color: AppColors.textMuted, fontSize: 13)),
+                Text("Sleep: 7.5 hrs", style: TextStyle(color: AppColors.textMuted, fontSize: 13)),
               ],
             ),
-            const Divider(height: 24),
+            Divider(height: 24),
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(Icons.lightbulb_outline, color: AppColors.warning, size: 20),
-                const SizedBox(width: 8),
+                Icon(Icons.lightbulb_outline, color: AppColors.warning, size: 20),
+                SizedBox(width: 8),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
+                    children: [
                       Text("Daily Tip", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.textDark)),
                       SizedBox(height: 2),
                       Text("Take 5 minutes today to practice box breathing to help ground yourself.", style: TextStyle(color: AppColors.textMuted, fontSize: 13)),

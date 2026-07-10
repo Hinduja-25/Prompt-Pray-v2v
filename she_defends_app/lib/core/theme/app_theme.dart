@@ -22,7 +22,6 @@ class AppTheme {
       colorScheme: const ColorScheme.light(
         primary: AppColors.primary,
         secondary: AppColors.primaryActive,
-        background: AppColors.background,
         surface: Colors.white,
         error: AppColors.emergency,
       ),
