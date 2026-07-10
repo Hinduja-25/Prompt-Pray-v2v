@@ -157,26 +157,26 @@ class _WellnessScreenState extends ConsumerState<WellnessScreen> with SingleTick
 
                   return GestureDetector(
                     onTap: () => _logMood(label),
-                    child: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: isSel ? AppColors.lavender : Colors.transparent,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Column(
-                        children: [
-                          Text(icon, style: const TextStyle(fontSize: 32)),
-                          const SizedBox(height: 4),
-                          Text(
-                            label,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: isSel ? AppColors.primaryActive : AppColors.textMuted,
-                              fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
-                            ),
-                          )
-                        ],
-                      ),
+                    child: Column(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: isSel ? AppColors.lavender : Colors.transparent,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Text(icon, style: const TextStyle(fontSize: 32)),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          label,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: isSel ? AppColors.primaryActive : AppColors.textMuted,
+                            fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
+                          ),
+                        )
+                      ],
                     ),
                   );
                 }).toList(),

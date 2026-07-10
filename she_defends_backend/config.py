@@ -21,3 +21,7 @@ class Config:
     CLOUDINARY_CLOUD_NAME = os.getenv("CLOUDINARY_CLOUD_NAME", "")
     CLOUDINARY_API_KEY = os.getenv("CLOUDINARY_API_KEY", "")
     CLOUDINARY_API_SECRET = os.getenv("CLOUDINARY_API_SECRET", "")
+    
+    # OpenAI & Groq fallback key configs
+    OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+    GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")

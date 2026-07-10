@@ -28,7 +28,8 @@ def analyze_symptom():
         "timestamp": datetime.utcnow().isoformat()
     }
     log_id = db_service.add_symptom_log(uid, log_entry)
-    log_entry["id"] = log_id
+    log_entry.pop("_id", None)
+    log_entry["id"] = str(log_id)
     
     return jsonify(log_entry), 200
 
@@ -87,6 +88,7 @@ def upload_report():
     }
     
     log_id = db_service.add_symptom_log(uid, log_entry)
-    log_entry["id"] = log_id
+    log_entry.pop("_id", None)
+    log_entry["id"] = str(log_id)
     
     return jsonify(log_entry), 200

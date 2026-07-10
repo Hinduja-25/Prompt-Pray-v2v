@@ -4,6 +4,7 @@ import 'dart:async';
 import 'package:she_defends_app/core/providers/app_state.dart';
 import 'package:she_defends_app/core/theme/app_theme.dart';
 import 'package:she_defends_app/core/network/api_client.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class SafetyScreen extends ConsumerStatefulWidget {
   const SafetyScreen({super.key});
@@ -61,14 +62,15 @@ class _SafetyScreenState extends ConsumerState<SafetyScreen> {
   }
 
   Future<void> _handleStartJourney() async {
+    final src = _startController.text.trim().isEmpty ? "My Location (GPS)" : _startController.text.trim();
     final dest = _destController.text.trim();
     if (dest.isEmpty) return;
 
-    ref.read(guardianProvider.notifier).startJourney("My Location (GPS)", dest);
+    ref.read(guardianProvider.notifier).startJourney(src, dest);
     
     try {
       await _apiClient.post("/safety/journey/start", data: {
-        "source": "My Location (GPS)",
+        "source": src,
         "destination": dest,
         "eta": 15,
         "route_type": _selectedRouteType,
@@ -281,11 +283,20 @@ class _SafetyScreenState extends ConsumerState<SafetyScreen> {
 
   // --- Active Journey Map Card ---
   Widget _buildActiveJourneyCard(GuardianState state) {
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      elevation: 0,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18), side: BorderSide(color: Colors.grey.shade200)),
-      child: Column(
+    return GestureDetector(
+      onTap: () async {
+        final origin = Uri.encodeComponent(state.source);
+        final destination = Uri.encodeComponent(state.destination);
+        final url = Uri.parse("https://www.google.com/maps/dir/?api=1&origin=$origin&destination=$destination");
+        if (await canLaunchUrl(url)) {
+          await launchUrl(url, mode: LaunchMode.externalApplication);
+        }
+      },
+      child: Card(
+        clipBehavior: Clip.antiAlias,
+        elevation: 0,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18), side: BorderSide(color: Colors.grey.shade200)),
+        child: Column(
         children: [
           Container(
             height: 220,
@@ -360,7 +371,7 @@ class _SafetyScreenState extends ConsumerState<SafetyScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 const Text("Current Location", style: TextStyle(color: AppColors.textMuted, fontSize: 10)),
-                                const Text("5th Avenue, Manhattan", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                Text(state.source, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                                 const SizedBox(height: 10),
                                 const Text("Destination", style: TextStyle(color: AppColors.textMuted, fontSize: 10)),
                                 Text(state.destination, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
@@ -398,31 +409,33 @@ class _SafetyScreenState extends ConsumerState<SafetyScreen> {
                 Row(
                   children: [
                     Expanded(
-                      flex: 2,
+                      flex: 1,
                       child: ElevatedButton.icon(
                         onPressed: () {
                           ref.read(guardianProvider.notifier).reset();
                         },
-                        icon: const Icon(Icons.cancel_outlined, size: 18),
-                        label: const Text("End Journey"),
+                        icon: const Icon(Icons.cancel_outlined, size: 16),
+                        label: const Text("End Journey", maxLines: 1, overflow: TextOverflow.ellipsis),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.grey.shade200,
                           foregroundColor: Colors.black87,
                           elevation: 0,
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
                         ),
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 8),
                     Expanded(
-                      flex: 3,
+                      flex: 1,
                       child: ElevatedButton.icon(
                         onPressed: () {
                           ref.read(fakeCallProvider.notifier).triggerIncomingCall();
                         },
-                        icon: const Icon(Icons.phone_in_talk, size: 18),
-                        label: const Text("Fake Call"),
+                        icon: const Icon(Icons.phone_in_talk, size: 16),
+                        label: const Text("Fake Call", maxLines: 1, overflow: TextOverflow.ellipsis),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.primary,
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
                         ),
                       ),
                     ),
@@ -535,8 +548,9 @@ class _SafetyScreenState extends ConsumerState<SafetyScreen> {
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 
   // --- Plan/Start Journey Card ---
   Widget _buildPlanJourneyCard() {
