@@ -1,13 +1,12 @@
 import 'package:dio/dio.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
-import 'dart:io';
 
 class ApiClient {
   final Dio dio;
   
   // Set fallback backend URL (localhost for emulator, render in production)
-  static final String _baseUrl = Platform.isAndroid 
+  static final String _baseUrl = (!kIsWeb && defaultTargetPlatform == TargetPlatform.android)
       ? 'http://10.0.2.2:5000/api'  // Android Emulator loopback
       : 'http://localhost:5000/api'; // iOS/Web/Desktop loopback
 
